@@ -1,0 +1,187 @@
+Metadata-Version: 2.4
+Name: bughunter
+Version: 0.1.0
+Summary: Personal Bug Bounty Automation Tool
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi==0.115.0
+Requires-Dist: uvicorn==0.32.0
+Requires-Dist: jinja2==3.1.4
+Requires-Dist: playwright==1.48.0
+Requires-Dist: httpx==0.28.1
+Requires-Dist: sqlalchemy==2.0.36
+Requires-Dist: cvss==3.6
+Requires-Dist: typer==0.12.5
+Requires-Dist: dnspython==2.7.0
+Requires-Dist: pydantic==2.10.0
+Requires-Dist: pydantic-settings==2.6.1
+Requires-Dist: python-multipart==0.0.18
+Requires-Dist: aiofiles==24.1.0
+Requires-Dist: websockets==13.1
+Requires-Dist: lxml==5.3.0
+Requires-Dist: beautifulsoup4==4.12.3
+Requires-Dist: tldextract==5.1.2
+Requires-Dist: publicsuffix2==2.20191221
+Requires-Dist: pyyaml==6.0.1
+Requires-Dist: rich==13.9.4
+Requires-Dist: tenacity==8.5.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+
+# BugHunter - Personal Bug Bounty Automation Tool
+
+> **⚠️ Legal Notice**: This tool is for testing targets you are explicitly authorized to test — programs on HackerOne/Bugcrowd where you're enrolled and in-scope, or your own infrastructure. Running any of this against unauthorized targets is illegal regardless of intent.
+
+A self-contained, local-first bug bounty automation tool that runs as a web application. Everything (Python deps, binaries like nuclei/sqlmap, databases) lives inside the project directory — no system-wide installation.
+
+## Features
+
+- **Self-contained**: Single `bootstrap.sh` creates venv, downloads all binaries (nuclei, subfinder, httpx), installs Playwright browsers locally
+- **Web UI**: Local-only FastAPI server (127.0.0.1:8080) with real-time WebSocket progress
+- **Comprehensive Detection**: 18+ vulnerability classes with proof-based confirmation
+- **Multi-format Reports**: HackerOne and Bugcrowd markdown templates with VRT category mapping
+- **Authenticated Testing**: Multi-session support for IDOR/BOLA/privilege escalation detection
+- **OOB Confirmation**: Built-in DNS/HTTP callback server for blind SSRF/XXE/SSTI/RCE
+- **Evidence Storage**: SQLite database with full request/response capture, screenshots, dedup
+
+## Quick Start
+
+```bash
+git clone <this-repo> bughunter
+cd bughunter
+./bootstrap.sh
+
+# Start web UI
+source venv/bin/activate
+python app/server.py
+# Open http://127.0.0.1:8080
+
+# Or use CLI
+bughunter scan https://example.com
+bughunter serve
+```
+
+## Directory Structure
+
+```
+bughunter/
+├── venv/                      # Local Python virtualenv
+├── tools/                     # Downloaded binaries (nuclei, subfinder, httpx, Playwright browsers)
+├── data/
+│   ├── findings.db            # SQLite database
+│   ├── sessions/              # Auth sessions/cookies per target
+│   └── payloads/              # Custom payload library
+├── reports/
+│   └── <target>/<date>/       # Generated markdown reports
+├── app/
+│   ├── server.py              # FastAPI web server
+│   ├── recon/                 # Recon module (subfinder, nuclei, tech detection)
+│   ├── crawler/               # JS-aware crawler (Playwright)
+│   ├── detectors/             # Vulnerability detectors (plugin pattern)
+│   ├── validation/            # Proof capture, diffing, dedup
+│   ├── scoring/               # CVSS 3.1 scoring
+│   ├── reporting/             # HackerOne/Bugcrowd templates
+│   └── oob_server.py          # Out-of-band callback server
+├── bootstrap.sh               # One-shot installer
+├── requirements.txt
+├── pyproject.toml
+└── cli.py                     # Typer CLI entrypoint
+```
+
+## Vulnerability Classes Detected
+
+| Category | Detectors |
+|----------|-----------|
+| **Injection** | SQLi (error/boolean/time), NoSQLi, Command Injection, LDAP, XPath, XXE |
+| **XSS** | Reflected (Playwright execution), Stored, DOM-based (taint tracking), Blind (OOB) |
+| **SSRF** | Basic, Blind (OOB), Cloud metadata (AWS/GCP/Azure), Filter bypasses |
+| **Auth/Access** | IDOR, BOLA (API Top 10 #1), Privilege Escalation, JWT flaws |
+| **SSTI** | Jinja2, Twig, Freemarker, Velocity, Smarty, ERB, Thymeleaf, Express |
+| **File Upload** | Extension bypass, Content-Type bypass, Polyglots, Webshell detection |
+| **Business Logic** | Race conditions (TOCTOU), Price/quantity manipulation, Workflow bypass |
+| **Client-side** | Open Redirect, CSRF, CORS, Clickjacking, postMessage, DOM Clobbering, Prototype Pollution |
+| **API Security** | All OWASP API Top 10 2023 categories |
+| **Infrastructure** | Subdomain takeover, Exposed admin panels, Weak TLS |
+| **AI/LLM** | Prompt injection, Sensitive info disclosure, Insecure output handling |
+
+## Detection Philosophy
+
+**Proof over patterns**: Every finding requires executable proof:
+- XSS → Headless browser confirms JS execution
+- SQLi → Boolean differential + timing + optional sqlmap handoff
+- SSTI → Math expression evaluation (`{{7*7}}` → `49`)
+- Blind SSRF/XXE/RCE → OOB DNS/HTTP callback correlation
+- Race conditions → Concurrent request state divergence
+
+## Report Generation
+
+Reports are generated as Markdown in your chosen format:
+
+```markdown
+# [Critical] SQL Injection in /api/users?id=1
+
+## Summary
+The `id` parameter is vulnerable to error-based SQL injection...
+
+## Severity
+Critical (CVSS 3.1: 9.8 — CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H)
+
+## Steps To Reproduce
+1. Navigate to: https://target.com/api/users?id=1'
+2. Observe database error in response
+
+## Proof of Concept
+```
+GET /api/users?id=1' HTTP/1.1
+Host: target.com
+```
+
+## Impact
+Full database read/write access via UNION injection...
+
+## Suggested Remediation
+Use parameterized queries. Never concatenate user input into SQL.
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and customize:
+
+```bash
+OOB_DOMAIN=your-oob-domain.com  # Required for real OOB callbacks
+OOB_HTTP_PORT=8081
+OOB_DNS_PORT=5353
+SERVER_HOST=127.0.0.1
+SERVER_PORT=8080
+```
+
+## Adding Custom Payloads
+
+```bash
+bughunter payload add --category sqli --context "mysql" --payload "' OR '1'='1" --desc "Basic boolean bypass"
+```
+
+Or via web UI → Settings → Payload Library.
+
+## Architecture Highlights
+
+1. **Plugin-based detectors** — Each vuln class is a独立 `Detector` class with `applies_to()` and `run()`
+2. **Multi-role crawling** — Crawl as multiple users simultaneously for IDOR/BOLA detection
+3. **Stateful workflow testing** — Multi-step flows (cart→checkout) with concurrent race testing
+4. **Scope-aware** — Parses program scope rules, enforces rate limits, excludes paths
+5. **Dedup by design** — `hash(vuln_class + endpoint + param)` prevents duplicate findings
+6. **Confidence tagging** — `confirmed` (proof) vs `suspected` (heuristic only)
+
+## Requirements
+
+- Python 3.10+
+- Linux/macOS (Windows WSL2 supported)
+- ~500MB disk space for tools/browsers
+
+## License
+
+MIT — Use responsibly and only on authorized targets.

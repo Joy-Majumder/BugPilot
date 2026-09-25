@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BugHunter - Bug Bounty Automation Tool</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid #30363d; margin-bottom: 30px; }
+        h1 { font-size: 1.5rem; font-weight: 600; color: #f0f6fc; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; text-decoration: none; }
+        .btn-primary { background: #238636; color: white; border-color: #238636; }
+        .btn-primary:hover { background: #2ea043; border-color: #2ea043; }
+        .btn-secondary { background: #21262d; color: #e6edf3; border-color: #30363d; }
+        .btn-secondary:hover { background: #30363d; }
+        .btn-danger { background: #da3633; color: white; border-color: #da3633; }
+        .btn-danger:hover { background: #f85149; border-color: #f85149; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .card-title { font-size: 1.1rem; font-weight: 600; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; color: #e6edf3; }
+        input, textarea, select { width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; font-size: 14px; font-family: inherit; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .scan-list { display: grid; gap: 12px; }
+        .scan-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+        .scan-info { flex: 1; }
+        .scan-url { font-family: monospace; font-size: 14px; color: #58a6ff; text-decoration: none; }
+        .scan-url:hover { text-decoration: underline; }
+        .scan-meta { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; color: #8b949e; }
+        .scan-status { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .status-pending { background: #9e6a03; color: #fff; }
+        .status-running { background: #0969da; color: #fff; }
+        .status-completed { background: #1a7f37; color: #fff; }
+        .status-failed { background: #da3633; color: #fff; }
+        .status-stopped { background: #6e7681; color: #fff; }
+        .progress-bar { width: 100%; height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { height: 100%; background: #238636; transition: width 0.3s; }
+        .log-container { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 13px; }
+        .log-line { margin-bottom: 4px; }
+        .log-time { color: #8b949e; }
+        .log-message { color: #e6edf3; }
+        .severity-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .sev-critical { background: #da3633; color: white; }
+        .sev-high { background: #f85149; color: white; }
+        .sev-medium { background: #d29922; color: black; }
+        .sev-low { background: #238636; color: white; }
+        .sev-info { background: #58a6ff; color: white; }
+        .confidence-badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+        .conf-confirmed { background: #238636; color: white; }
+        .conf-suspected { background: #9e6a03; color: white; }
+        .finding-table { width: 100%; border-collapse: collapse; }
+        .finding-table th, .finding-table td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
+        .finding-table th { color: #8b949e; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+        .finding-table tr:hover { background: #1c2128; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-close { background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; }
+        .tabs { display: flex; border-bottom: 1px solid #30363d; margin-bottom: 16px; }
+        .tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; color: #8b949e; }
+        .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .evidence-box { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; }
+        .auth-session { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; }
+        .auth-session input { flex: 1; min-width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐛 BugHunter</h1>
+            <button class="btn btn-primary" onclick="showNewScanModal()">New Scan</button>
+        </header>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Recent Scans</span>
+            </div>
+            <div class="scan-list" id="scanList">
+                {% for scan in scans %}
+                <div class="scan-item">
+                    <div class="scan-info">
+                        <a href="/scan/{{ scan.id }}" class="scan-url">{{ scan.target_url }}</a>
+                        <div class="scan-meta">
+                            <span>{{ scan.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span>{{ scan.name }}</span>
+                        </div>
+                        {% if scan.status == 'running' %}
+                        <div class="progress-bar" id="progress-{{ scan.id }}">
+                            <div class="progress-fill" style="width: {{ scan.config.get('progress_percent', 0) }}%"></div>
+                        </div>
+                        <div style="font-size: 12px; color: #8b949e; margin-top: 4px;" id="progress-msg-{{ scan.id }}">
+                            {{ scan.config.get('progress_message', '') }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <span class="scan-status status-{{ scan.status.value }}">{{ scan.status.value }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="newScanModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>New Scan</h2>
+                <button class="modal-close" onclick="hideNewScanModal()">&times;</button>
+            </div>
+            <form id="newScanForm">
+                <div class="form-group">
+                    <label>Target URL(s)</label>
+                    <textarea name="target_url" rows="3" placeholder="https://example.com&#10;https://api.example.com" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Scan Name</label>
+                    <input type="text" name="name" placeholder="Optional name for this scan">
+                </div>
+
+                <div class="form-group">
+                    <label>Scope Rules</label>
+                    <div class="form-row">
+                        <div>
+                            <label>Include Patterns (one per line)</label>
+                            <textarea name="scope_include" rows="3" placeholder="example.com&#10;api.example.com"></textarea>
+                        </div>
+                        <div>
+                            <label>Exclude Patterns (one per line)</label>
+                            <textarea name="scope_exclude" rows="3" placeholder="logout&#10;admin/delete"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Auth Sessions</label>
+                    <div id="authSessions"></div>
+                    <button type="button" class="btn btn-secondary" onclick="addAuthSession()">+ Add Auth Session</button>
+                </div>
+
+                <div class="form-group">
+                    <label>Detectors to Run</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        {% for det in detectors %}
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="checkbox" name="detectors" value="{{ det }}" checked> {{ det }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Rate Limit (req/s)</label>
+                        <input type="number" name="rate_limit" value="10" min="1" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Concurrency</label>
+                        <input type="number" name="concurrency" value="5" min="1" max="20">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="hideNewScanModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create & Start Scan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const detectors = [
+            'reflected_xss', 'stored_xss', 'dom_xss',
+            'sqli', 'nosqli', 'command_injection',
+            'ssrf', 'open_redirect', 'csrf', 'xxe',
+            'idor', 'bola', 'privilege_escalation', 'jwt_flaws',
+            'ssti', 'file_upload', 'race_condition', 'cors', 'subdomain_takeover'
+        ];
+
+        function showNewScanModal() {
+            document.getElementById('newScanModal').classList.add('active');
+            addAuthSession();
+        }
+
+        function hideNewScanModal() {
+            document.getElementById('newScanModal').classList.remove('active');
+        }
+
+        function addAuthSession() {
+            const container = document.getElementById('authSessions');
+            const div = document.createElement('div');
+            div.className = 'auth-session';
+            div.innerHTML = `
+                <input type="text" name="auth_name" placeholder="Session name (e.g., user_a)" required>
+                <select name="auth_type">
+                    <option value="cookie">Cookie</option>
+                    <option value="bearer">Bearer Token</option>
+                    <option value="header">Custom Header</option>
+                </select>
+                <input type="text" name="auth_value" placeholder="Cookie string or token value" required>
+                <button type="button" class="btn btn-secondary" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            container.appendChild(div);
+        }
+
+        document.getElementById('newScanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            const authSessions = [];
+            const authNames = formData.getAll('auth_name');
+            const authTypes = formData.getAll('auth_type');
+            const authValues = formData.getAll('auth_value');
+
+            for (let i = 0; i < authNames.length; i++) {
+                if (authNames[i] && authValues[i]) {
+                    const session = { name: authNames[i], type: authTypes[i] };
+                    if (authTypes[i] === 'cookie') {
+                        session.cookies = parseCookies(authValues[i]);
+                    } else if (authTypes[i] === 'bearer') {
+                        session.headers = { 'Authorization': `Bearer ${authValues[i]}` };
+                    } else {
+                        session.headers = { 'X-Custom-Auth': authValues[i] };
+                    }
+                    authSessions.push(session);
+                }
+            }
+
+            const scope = {
+                include: formData.get('scope_include')?.split('\n').filter(Boolean) || [],
+                exclude: formData.get('scope_exclude')?.split('\n').filter(Boolean) || [],
+            };
+
+            const detectors = formData.getAll('detectors');
+
+            const response = await fetch('/api/scans', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    target_url: formData.get('target_url'),
+                    name: formData.get('name'),
+                    auth_sessions: authSessions,
+                    scope: scope,
+                    detectors: detectors,
+                    rate_limit: parseInt(formData.get('rate_limit')),
+                    concurrency: parseInt(formData.get('concurrency')),
+                })
+            });
+
+            const result = await response.json();
+            if (result.scan_id) {
+                hideNewScanModal();
+                await fetch(`/api/scans/${result.scan_id}/start`, { method: 'POST' });
+                setTimeout(() => location.reload(), 1000);
+            }
+        });
+
+        function parseCookies(str) {
+            const cookies = {};
+            str.split(';').forEach(pair => {
+                const [key, ...val] = pair.split('=');
+                if (key && val.length) cookies[key.trim()] = val.join('=').trim();
+            });
+            return cookies;
+        }
+
+        async function pollProgress() {
+            const scans = document.querySelectorAll('[id^="progress-"]:not([id^="progress-msg-"])');
+            for (const el of scans) {
+                const scanId = el.id.replace('progress-', '');
+                try {
+                    const resp = await fetch(`/api/scans/${scanId}`);
+                    const scan = await resp.json();
+                    if (scan.status === 'running') {
+                        const msgEl = document.getElementById(`progress-msg-${scanId}`);
+                        if (msgEl) msgEl.textContent = scan.config?.progress_message || '';
+                        if (scan.config?.progress_percent !== undefined) {
+                            el.querySelector('.progress-fill').style.width = scan.config.progress_percent + '%';
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+
+        setInterval(pollProgress, 3000);
+    </script>
+</body>
+</html>
