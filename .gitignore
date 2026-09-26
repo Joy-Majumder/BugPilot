@@ -30,13 +30,12 @@ reports/
 ehthumbs.db
 Thumbs.db
 
-# Tools (downloaded binaries)
+# Tools (downloaded binaries - use bootstrap.sh to install)
 tools/nuclei
 tools/subfinder
 tools/httpx
 tools/pw-browsers/
 tools/nuclei-templates/
-tools/LICENSE.md
 
 # IDE
 .idea/
