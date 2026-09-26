@@ -403,7 +403,7 @@ class CORSScanner(Detector):
                             f"Access-Control-Request-Headers: Content-Type"
                         ),
                         "response_body_snippet": (
-                            f"HTTP/{resp.http_version} {resp.status_code}\n"
+                            f"{resp.http_version} {resp.status_code}\n"
                             + "\n".join(f"{k}: {v}" for k, v in cors_headers.items())
                         ),
                     },
