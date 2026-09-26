@@ -95,8 +95,8 @@ class ScanPipeline:
                     timeout=90,
                 )
             except asyncio.TimeoutError:
+                await self._update_progress("Crawl timed out, using target URL as fallback endpoint", 50)
                 endpoints = [Endpoint(url=target_url, method="GET", params=[])]
-                self._update_progress("Crawl timed out, using target URL as fallback endpoint", 50)
 
             await self._update_progress("Running detectors...", 50)
             findings = await asyncio.wait_for(
