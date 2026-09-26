@@ -226,6 +226,7 @@ class FileUploadDetector(Detector):
                                 "upload_path": upload_path,
                                 "verification": verify,
                                 "response_status": resp.status_code,
+                                "request_url": endpoint.url,
                                 "response_body": resp.text[:500],
                             },
                             summary=f"Unrestricted File Upload: {ext} file uploaded and executed as {filename}",
@@ -308,6 +309,8 @@ class RaceConditionDetector(Detector):
                         "successful_responses": success_count,
                         "unique_responses": unique_bodies,
                         "sample_responses": [r.get("body", "")[:200] for r in results[:3] if r],
+                        "request_url": endpoint.url,
+                        "response_body_snippet": "\n---\n".join(r.get("body", "")[:500] for r in results[:3] if r),
                     },
                     summary=f"Race Condition in {endpoint.method} {endpoint.url}",
                     description=(
@@ -474,6 +477,8 @@ class SubdomainTakeoverDetector(Detector):
                                     "cname": cname,
                                     "service": service,
                                     "fingerprint": verify,
+                                    "request_url": f"http://{subdomain}",
+                                    "response_body_snippet": verify[:500],
                                 },
                                 summary=f"Subdomain Takeover: {subdomain} -> {cname} ({service})",
                                 description=(
