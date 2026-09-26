@@ -53,7 +53,10 @@ class Finding:
 
     @property
     def dedup_hash(self) -> str:
-        key = f"{self.vuln_class}|{self.endpoint}|{self.param or ''}"
+        from urllib.parse import urlparse
+        parsed = urlparse(self.endpoint)
+        host = f"{parsed.scheme}://{parsed.netloc}"
+        key = f"{self.vuln_class}|{host}|{self.param or ''}"
         return hashlib.sha256(key.encode()).hexdigest()[:64]
 
     @property

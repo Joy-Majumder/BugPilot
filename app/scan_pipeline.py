@@ -1,9 +1,10 @@
 import asyncio
 import uuid
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from sqlalchemy.orm import Session
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from urllib.parse import urlparse, urljoin
 
 from app.database import get_db_session
 from app.models import ScanSession, ScanStatus, CrawlData, AuthSession
@@ -19,6 +20,29 @@ import httpx
 from playwright.async_api import async_playwright
 
 
+COMMON_API_PATHS = [
+    "/api", "/api/v1", "/api/v2", "/api/v3", "/api/v4", "/api/v5",
+    "/api/v6", "/api/v7", "/api/v8", "/api/json", "/api/rest",
+    "/rest", "/rest/v1", "/rest/v2", "/graphql", "/graphql/graphql",
+    "/gql", "/wp-json", "/wp-json/wp/v2", "/admin", "/admin/api",
+    "/admin/api/v1", "/api/admin", "/api/users", "/api/auth",
+    "/api/login", "/api/search", "/api/data", "/api/config",
+    "/api/status", "/api/health", "/api/version", "/api/docs",
+    "/api/swagger", "/api/openapi", "/api/swagger.json",
+    "/api/swaggerui", "/api/redoc", "/api/v1/api", "/v1", "/v2",
+    "/v3", "/internal", "/internal/api", "/debug", "/debug/vars",
+    "/metrics", "/prometheus", "/api/metrics", "/api/config.json",
+    "/api/settings", "/api/info", "/api/me", "/api/profile",
+    "/api/account", "/api/orders", "/api/products", "/api/cart",
+    "/api/checkout", "/api/payment", "/api/webhook", "/api/callback",
+]
+
+BLACKLISTED_HOSTS = {"youtube.com", "youtu.be", "linkedin.com", "linkedin.com", 
+                      "facebook.com", "twitter.com", "instagram.com", "tiktok.com",
+                      "linkedin.com", "google.com", "google.co.uk", "bing.com",
+                      "googleapis.com", "gstatic.com", "cloudflare.com", "akamai.net"}
+
+
 class ScanPipeline:
     def __init__(self, scan_session_id: int):
         self.scan_session_id = scan_session_id
@@ -29,6 +53,7 @@ class ScanPipeline:
         self.findings_store = FindingStore(self.db)
         self.scan_session = None
         self.tool_status = {}
+        self.recon_results: Dict[str, Any] = {}
         self._playwright = None
 
     async def initialize(self):
@@ -76,11 +101,13 @@ class ScanPipeline:
             auth_sessions = self._load_auth_sessions()
 
             await self._update_progress("Running reconnaissance...", 10)
+            recon_results = {"errors": [], "tool_status": {}, "live_hosts": []}
             try:
                 recon_results = await asyncio.wait_for(
                     self._run_recon(target_url, scope_config),
                     timeout=45,
                 )
+                self.recon_results = recon_results
                 self.tool_status = recon_results.get("tool_status", {})
                 self.scan_session.config = {**(self.scan_session.config or {}), "tool_status": self.tool_status, "recon_errors": recon_results.get("errors", [])}
                 self.db.commit()
@@ -88,10 +115,13 @@ class ScanPipeline:
                 self.scan_session.config = {**(self.scan_session.config or {}), "recon_errors": ["Reconnaissance timed out (45s)"]}
                 self.db.commit()
 
+            await self._update_progress("Discovering subdomains and API endpoints...", 25)
+            host_urls = self._collect_host_urls(target_url, recon_results)
+
             await self._update_progress("Crawling application...", 30)
             try:
                 endpoints = await asyncio.wait_for(
-                    self._run_crawl(target_url, auth_sessions, scope_config),
+                    self._run_crawl(target_url, auth_sessions, scope_config, host_urls),
                     timeout=90,
                 )
             except asyncio.TimeoutError:
@@ -146,11 +176,68 @@ class ScanPipeline:
         recon = ReconModule(self.http_client)
         return await recon.run(target_url, scope_config)
 
-    async def _run_crawl(self, target_url: str, auth_sessions: List[Dict], scope_config: Dict) -> List:
-        crawler = Crawler(self.http_client, self.playwright_browser)
-        endpoints = await crawler.crawl(target_url, auth_sessions, scope_config)
+    def _collect_host_urls(self, target_url: str, recon_results: Dict) -> List[str]:
+        parsed = urlparse(target_url)
+        target_domain = parsed.netloc.split(":")[0]
+        target_scheme = parsed.scheme or "https"
+        
+        host_urls: List[str] = [target_url]
+        visited_hosts: Set[str] = {f"{target_scheme}://{target_domain}"}
 
-        for ep in endpoints:
+        for host in recon_results.get("live_hosts", []):
+            if isinstance(host, dict):
+                host_url = host.get("url") or host.get("input", "")
+            else:
+                host_url = host
+            if not host_url:
+                continue
+            if not host_url.startswith(("http://", "https://")):
+                host_url = f"{target_scheme}://{host_url}"
+            host_domain = urlparse(host_url).netloc.split(":")[0]
+            if host_domain in BLACKLISTED_HOSTS or self._is_external_domain(host_domain, target_domain):
+                continue
+            if host_url in visited_hosts:
+                continue
+            visited_hosts.add(host_url)
+            host_urls.append(host_url)
+
+        return host_urls
+
+    @staticmethod
+    def _is_external_domain(host_domain: str, target_domain: str) -> bool:
+        target_root = ".".join(target_domain.split(".")[-2:])
+        host_root = ".".join(host_domain.split(".")[-2:])
+        return target_root != host_root
+
+    async def _run_crawl(self, target_url: str, auth_sessions: List[Dict], scope_config: Dict, host_urls: List[str] = None) -> List:
+        if host_urls is None:
+            host_urls = [target_url]
+
+        crawler = Crawler(self.http_client, self.playwright_browser)
+        all_endpoints: List[Endpoint] = []
+        seen_urls: Set[str] = set()
+
+        for host_url in host_urls:
+            try:
+                endpoints = await asyncio.wait_for(
+                    crawler.crawl(host_url, auth_sessions, scope_config),
+                    timeout=90,
+                )
+            except (asyncio.TimeoutError, Exception):
+                endpoints = []
+
+            for ep in endpoints:
+                if ep.url not in seen_urls:
+                    seen_urls.add(ep.url)
+                    all_endpoints.append(ep)
+
+            api_endpoints = await self._discover_api_paths(host_url)
+            for api_url in api_endpoints:
+                if api_url not in seen_urls:
+                    seen_urls.add(api_url)
+                    all_endpoints.append(Endpoint(url=api_url, method="GET", params=[]))
+
+        for ep in all_endpoints:
             crawl_data = CrawlData(
                 scan_session_id=self.scan_session_id,
                 url=ep.url,
@@ -164,7 +251,23 @@ class ScanPipeline:
             self.db.add(crawl_data)
         self.db.commit()
 
-        return endpoints
+        return all_endpoints
+
+    async def _discover_api_paths(self, base_url: str) -> List[str]:
+        parsed = urlparse(base_url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        api_urls: List[str] = []
+
+        for path in COMMON_API_PATHS:
+            url = base + path
+            try:
+                resp = await self.http_client.get(url, timeout=10, follow_redirects=True)
+                if resp.status_code < 400:
+                    api_urls.append(url)
+            except Exception:
+                pass
+
+        return api_urls
 
     async def _run_detectors(self, endpoints: List, auth_sessions: List[Dict], selected_detectors: List[str]) -> List:
         all_detectors = get_all_detectors(self.http_client, self.oob_server, self.playwright_browser)

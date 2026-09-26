@@ -17,12 +17,17 @@ class Crawler:
         self.endpoints: List[Endpoint] = []
         self.max_depth = 3
         self.max_pages = 100
+        self.base_domain: str = ""
+        self._external_hosts: Set[str] = set()
 
     async def crawl(self, start_url: str, auth_sessions: List[Dict] = None, scope_config: Dict = None) -> List[Endpoint]:
         self.visited.clear()
         self.endpoints = []
+        self.base_domain = urlparse(start_url).netloc.split(":")[0]
+        self._external_hosts.clear()
 
         if self.playwright_browser:
+            await self._crawl_js(start_url, auth_sessions, scope_config)
             await self._crawl_js(start_url, auth_sessions, scope_config)
         else:
             await self._crawl_static(start_url, auth_sessions, scope_config)
@@ -42,7 +47,7 @@ class Crawler:
             if normalized in self.visited:
                 continue
 
-            if scope_config and not self._in_scope(normalized, scope_config):
+            if not self._in_scope(normalized, scope_config or {}):
                 continue
 
             self.visited.add(normalized)
@@ -190,12 +195,20 @@ class Crawler:
         include = scope_config.get("include", [])
         exclude = scope_config.get("exclude", [])
 
-        if include:
-            if not any(pattern in url for pattern in include):
+        if exclude:
+            if any(pattern.lower() in url.lower() for pattern in exclude):
                 return False
 
-        if exclude:
-            if any(pattern in url for pattern in exclude):
+        if include:
+            if not any(pattern.lower() in url.lower() for pattern in include):
+                return False
+
+        if self.base_domain:
+            parsed = urlparse(url)
+            host = parsed.netloc.split(":")[0]
+            target_root = ".".join(self.base_domain.split(".")[-2:])
+            host_root = ".".join(host.split(".")[-2:])
+            if host_root != target_root:
                 return False
 
         return True
