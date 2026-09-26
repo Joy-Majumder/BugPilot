@@ -61,8 +61,22 @@ class Crawler:
         if auth_sessions:
             await self._apply_auth(page, auth_sessions[0])
 
-        await page.goto(start_url, wait_until="networkidle", timeout=settings.REQUEST_TIMEOUT * 1000)
-        await page.wait_for_load_state("networkidle")
+        try:
+            await page.goto(start_url, wait_until="domcontentloaded", timeout=settings.REQUEST_TIMEOUT * 1000)
+        except Exception as e:
+            print(f"[Crawler] Initial page load failed for {start_url}: {e}")
+            try:
+                await page.goto(start_url, timeout=settings.REQUEST_TIMEOUT * 1000)
+            except Exception:
+                await page.close()
+                await self._crawl_static(start_url, auth_sessions, scope_config)
+                return
+
+        for wait_state in ["networkidle", "load"]:
+            try:
+                await page.wait_for_load_state(wait_state, timeout=10000)
+            except Exception:
+                pass
 
         await self._extract_from_page(page, start_url, auth_sessions[0] if auth_sessions else None)
 
@@ -87,7 +101,11 @@ class Crawler:
 
     async def _crawl_single_js(self, page, url: str, session: Dict):
         try:
-            await page.goto(url, wait_until="networkidle", timeout=settings.REQUEST_TIMEOUT * 1000)
+            await page.goto(url, wait_until="domcontentloaded", timeout=settings.REQUEST_TIMEOUT * 1000)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
             await self._extract_from_page(page, url, session)
         except Exception:
             pass
