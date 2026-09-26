@@ -968,7 +968,7 @@ class CommandInjectionDetector(Detector):
                         "os_type": os_type,
                         "command": cmd,
                         "indicator_found": indicator,
-                        "response_snippet": body[:500],
+                        "response_body_snippet": body[:500],
                         "request_url": test_url,
                     },
                     summary=f"OS Command Injection in parameter '{param}' ({os_type}, output-based)",

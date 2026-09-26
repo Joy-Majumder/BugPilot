@@ -74,7 +74,7 @@ class Finding(Base):
     impact = Column(Text, nullable=True)
     remediation = Column(Text, nullable=True)
     bugcrowd_vrt_category = Column(String(200), nullable=True)
-    dedup_hash = Column(String(64), nullable=False, unique=True)
+    dedup_hash = Column(String(64), nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -85,7 +85,6 @@ class Finding(Base):
         Index("ix_findings_vuln_class", "vuln_class"),
         Index("ix_findings_confidence", "confidence"),
         Index("ix_findings_severity", "severity"),
-        Index("ix_findings_dedup_hash", "dedup_hash"),
     )
 
 

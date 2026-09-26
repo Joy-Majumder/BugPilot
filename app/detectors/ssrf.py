@@ -317,7 +317,7 @@ class SSRFDetector(Detector):
                             "type": "protocol_handler_ssrf",
                             "protocol": protocol,
                             "request_url": test_url,
-                            "response_snippet": test["body"][:500],
+                            "response_body_snippet": test["body"][:500],
                         },
                         summary=f"SSRF via {protocol} protocol handler in parameter '{param}'",
                         description=(
@@ -798,7 +798,8 @@ class HTTPRequestSmugglingDetector(Detector):
                 evidence={
                     "variant": variant,
                     "payload": payload[:200],
-                    "response_snippet": response[:500],
+                    "request_url": endpoint.url,
+                    "response_body_snippet": response[:500],
                     "indicators": [i for i, v in enumerate(indicators) if v],
                     "note": "Differential response suggests desync; manual verification required",
                 },
@@ -945,7 +946,7 @@ class XXEDetector(Detector):
                             "payload": payload[:200],
                             "type": "xxe_file_read",
                             "request_url": endpoint.url,
-                            "response_snippet": test["body"][:500],
+                            "response_body_snippet": test["body"][:500],
                         },
                         summary=f"XXE Local File Read in parameter '{param}'",
                         description=(
