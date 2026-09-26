@@ -10,6 +10,7 @@ from app.models import ScanSession, ScanStatus, CrawlData, AuthSession
 from app.recon.recon import ReconModule
 from app.crawler.crawler import Crawler
 from app.detectors import get_all_detectors
+from app.detectors.base import Endpoint
 from app.validation.store import FindingStore
 from app.scoring.cvss import CVSSScorer
 from app.oob_server import get_oob_server
@@ -75,21 +76,27 @@ class ScanPipeline:
             auth_sessions = self._load_auth_sessions()
 
             await self._update_progress("Running reconnaissance...", 10)
-            recon_results = await asyncio.wait_for(
-                self._run_recon(target_url, scope_config),
-                timeout=45,
-            )
-
-            # Store tool status
-            self.tool_status = recon_results.get("tool_status", {})
-            self.scan_session.config = {**(self.scan_session.config or {}), "tool_status": self.tool_status, "recon_errors": recon_results.get("errors", [])}
-            self.db.commit()
+            try:
+                recon_results = await asyncio.wait_for(
+                    self._run_recon(target_url, scope_config),
+                    timeout=45,
+                )
+                self.tool_status = recon_results.get("tool_status", {})
+                self.scan_session.config = {**(self.scan_session.config or {}), "tool_status": self.tool_status, "recon_errors": recon_results.get("errors", [])}
+                self.db.commit()
+            except asyncio.TimeoutError:
+                self.scan_session.config = {**(self.scan_session.config or {}), "recon_errors": ["Reconnaissance timed out (45s)"]}
+                self.db.commit()
 
             await self._update_progress("Crawling application...", 30)
-            endpoints = await asyncio.wait_for(
-                self._run_crawl(target_url, auth_sessions, scope_config),
-                timeout=90,
-            )
+            try:
+                endpoints = await asyncio.wait_for(
+                    self._run_crawl(target_url, auth_sessions, scope_config),
+                    timeout=90,
+                )
+            except asyncio.TimeoutError:
+                endpoints = [Endpoint(url=target_url, method="GET", params=[])]
+                self._update_progress("Crawl timed out, using target URL as fallback endpoint", 50)
 
             await self._update_progress("Running detectors...", 50)
             findings = await asyncio.wait_for(
