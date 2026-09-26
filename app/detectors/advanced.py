@@ -727,8 +727,9 @@ class WeakTLSDetector(Detector):
     cvss_vector_template = "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:L/A:N"
     bugcrowd_vrt_category = "Infrastructure > Weak TLS"
 
-    TLS_VERSIONS_TLS13 = {"TLSv1.3"}
+    WEAK_TLS_VERSIONS = {"TLSv1", "TLSv1.1"}
     INSECURE_CIPHERS = ["RC4", "DES", "3DES", "MD5", "NULL", "EXPORT", "LOW"]
+    RECOMMENDED_TLS = {"TLSv1.2", "TLSv1.3"}
     MISSING_HEADERS = [
         "strict-transport-security",
         "x-content-type-options",
@@ -762,9 +763,14 @@ class WeakTLSDetector(Detector):
                     cert = ssock.getpeercert()
 
             issues = []
+            severity = "suspected"
 
-            if tls_version not in self.TLS_VERSIONS_TLS13:
-                issues.append(f"Supports outdated TLS version: {tls_version}")
+            if tls_version in self.WEAK_TLS_VERSIONS:
+                issues.append(f"Deprecated TLS version: {tls_version}")
+                severity = "confirmed"
+
+            if tls_version not in self.RECOMMENDED_TLS:
+                issues.append(f"Non-recommended TLS version: {tls_version} (TLS 1.2+ recommended)")
 
             if cipher:
                 cipher_name = cipher[0]
@@ -783,7 +789,7 @@ class WeakTLSDetector(Detector):
                     self._make_finding(
                         endpoint=endpoint,
                         param=None,
-                        confidence="confirmed",
+                        confidence=severity,
                         evidence={
                             "request_url": endpoint.url,
                             "response_body_snippet": f"TLS Version: {tls_version}\nCipher: {cipher[0] if cipher else 'unknown'}",
