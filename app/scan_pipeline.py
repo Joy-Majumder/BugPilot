@@ -94,7 +94,7 @@ class ScanPipeline:
             await self._update_progress("Running detectors...", 50)
             findings = await asyncio.wait_for(
                 self._run_detectors(endpoints, auth_sessions, selected_detectors),
-                timeout=120,
+                timeout=300,
             )
 
             await self._update_progress("Finalizing...", 90)
@@ -179,7 +179,7 @@ class ScanPipeline:
                 return []
             async with semaphore:
                 try:
-                    return await asyncio.wait_for(detector.run(endpoint), timeout=45)
+                    return await asyncio.wait_for(detector.run(endpoint), timeout=20)
                 except (asyncio.TimeoutError, Exception):
                     return []
 
