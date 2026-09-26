@@ -98,18 +98,38 @@ class OOBServer:
         return web.Response(text="OK", status=200)
 
     def _run_dns_server(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            sock.bind(("0.0.0.0", self.dns_port))
-        except OSError as e:
-            # Port in use, disable DNS server
-            print(f"[OOB] DNS port {self.dns_port} unavailable: {e}. DNS callbacks disabled.")
+        candidate_ports = [self.dns_port] + list(range(5354, 5360))
+        sock = None
+        bound_port = None
+        for port in candidate_ports:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                if hasattr(socket, "SO_REUSEPORT"):
+                    try:
+                        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                    except OSError:
+                        pass
+                s.bind(("0.0.0.0", port))
+                sock = s
+                bound_port = port
+                break
+            except OSError:
+                s.close()
+                continue
+
+        if sock is None:
+            print(f"[OOB] DNS ports {candidate_ports[0]}-{candidate_ports[-1]} unavailable. DNS callbacks disabled.")
             self._dns_disabled = True
             return
-        sock.settimeout(1.0)
+
+        if bound_port != self.dns_port:
+            print(f"[OOB] DNS port {self.dns_port} unavailable, using port {bound_port} instead.")
+            self.dns_port = bound_port
+
         self._dns_disabled = False
         self._dns_sock = sock
+        sock.settimeout(1.0)
 
         while self._running:
             try:
