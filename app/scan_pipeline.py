@@ -205,4 +205,25 @@ class ScanPipeline:
         return all_findings
 
     async def _finalize(self, findings: List):
-        pass
+        from app.reporting import generate_report
+
+        target_url = self.scan_session.target_url if self.scan_session else None
+        seen_ids = set()
+        unique_findings = []
+        for f in findings:
+            if f.id not in seen_ids:
+                seen_ids.add(f.id)
+                unique_findings.append(f)
+
+        report_paths = []
+        for finding in unique_findings:
+            try:
+                path = generate_report(finding, "hackerone", target_url)
+                report_paths.append(path)
+            except Exception:
+                pass
+
+        if report_paths:
+            print(f"[BugHunter] Auto-generated {len(report_paths)} report(s)")
+            for p in report_paths:
+                print(f"  - {p}")
