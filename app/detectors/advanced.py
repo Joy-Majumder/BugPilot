@@ -47,8 +47,7 @@ class ClickjackingDetector(Detector):
                             "request_url": endpoint.url,
                             "response_body_snippet": (
                                 f"HTTP/1.1 {resp.status_code}\n"
-                                + "\n".join(f"{k}: {v}" for k, v in resp.headers.items()
-                                            if k.lower() in ("x-frame-options", "content-security-policy", "frame-options", "allow"))
+                                + "\n".join(f"{k}: {v}" for k, v in resp.headers.items())
                             ),
                             "x_frame_options": xfo or "(missing)",
                             "content_security_policy": csp or "(missing)",
