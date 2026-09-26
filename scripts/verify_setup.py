@@ -142,11 +142,13 @@ def check_detectors():
 
         names = [d.name for d in detectors]
         expected = [
-            "reflected_xss", "stored_xss", "dom_xss",
-            "sqli", "nosqli", "command_injection",
+            "reflected_xss", "stored_xss", "dom_xss", "blind_xss",
+            "sqli", "nosqli", "command_injection", "ldap", "xpath",
             "ssrf", "open_redirect", "csrf", "http_request_smuggling", "xxe",
             "idor", "bola", "privilege_escalation", "jwt_flaws",
-            "ssti", "file_upload", "race_condition", "cors", "subdomain_takeover",
+            "ssti", "file_upload", "race_condition", "price_manipulation", "cors", "subdomain_takeover",
+            "clickjacking", "dom_clobbering", "prototype_pollution", "postmessage",
+            "admin_panel", "weak_tls", "ai_llm_security",
             "smart_contract",
         ]
 

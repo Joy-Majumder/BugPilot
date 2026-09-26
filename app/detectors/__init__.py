@@ -5,6 +5,12 @@ from app.detectors.sqli import SQLIDetector, NoSQLIDetector, CommandInjectionDet
 from app.detectors.ssrf import SSRFDetector, OpenRedirectDetector, CSRFDetector, HTTPRequestSmugglingDetector, XXEDetector
 from app.detectors.auth import IDORDetector, BOLADetector, PrivilegeEscalationDetector, JWTDetector
 from app.detectors.other import SSTIDetector, FileUploadDetector, RaceConditionDetector, CORSScanner, SubdomainTakeoverDetector
+from app.detectors.advanced import (
+    ClickjackingDetector, LDAPInjectionDetector, XPathInjectionDetector,
+    DOMClobberDetector, PrototypePollutionDetector, PostMessageDetector,
+    BlindXSSDetector, AdminPanelDetector, WeakTLSDetector,
+    PriceQuantityManipulationDetector, AILMLMDetector,
+)
 from app.detectors.smart_contracts import SmartContractDetector
 
 
@@ -12,9 +18,12 @@ DETECTOR_CLASSES: List[Type[Detector]] = [
     ReflectedXSSDetector,
     StoredXSSDetector,
     DOMXSSDetector,
+    BlindXSSDetector,
     SQLIDetector,
     NoSQLIDetector,
     CommandInjectionDetector,
+    LDAPInjectionDetector,
+    XPathInjectionDetector,
     SSRFDetector,
     OpenRedirectDetector,
     CSRFDetector,
@@ -27,8 +36,16 @@ DETECTOR_CLASSES: List[Type[Detector]] = [
     SSTIDetector,
     FileUploadDetector,
     RaceConditionDetector,
+    PriceQuantityManipulationDetector,
     CORSScanner,
     SubdomainTakeoverDetector,
+    ClickjackingDetector,
+    DOMClobberDetector,
+    PrototypePollutionDetector,
+    PostMessageDetector,
+    AdminPanelDetector,
+    WeakTLSDetector,
+    AILMLMDetector,
     SmartContractDetector,
 ]
 
@@ -48,11 +65,14 @@ def get_detector_by_name(name: str, http_client, oob_server=None, playwright_bro
 
 def get_detectors_by_category(category: str, http_client, oob_server=None, playwright_browser=None) -> List[Detector]:
     category_map = {
-        "injection": ["sqli", "nosqli", "command_injection", "xxe", "ssti"],
-        "xss": ["reflected_xss", "stored_xss", "dom_xss"],
+        "injection": ["sqli", "nosqli", "command_injection", "ldap", "xpath", "xxe", "ssti"],
+        "xss": ["reflected_xss", "stored_xss", "blind_xss", "dom_xss"],
         "ssrf": ["ssrf", "open_redirect", "csrf", "http_request_smuggling"],
         "auth": ["idor", "bola", "privilege_escalation", "jwt_flaws"],
-        "other": ["file_upload", "race_condition", "cors", "subdomain_takeover"],
+        "other": ["file_upload", "race_condition", "price_manipulation", "cors", "subdomain_takeover"],
+        "client_side": ["clickjacking", "dom_clobbering", "prototype_pollution", "postmessage"],
+        "infrastructure": ["admin_panel", "weak_tls"],
+        "ai": ["ai_llm_security"],
         "blockchain": ["smart_contract"],
     }
     names = category_map.get(category, [])
