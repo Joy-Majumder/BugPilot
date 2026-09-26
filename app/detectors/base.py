@@ -202,9 +202,9 @@ class Validator:
         return ValidationResult(confirmed=False, evidence={}, notes="No significant timing delta")
 
     @staticmethod
-    def xss_executed(page, marker: str) -> ValidationResult:
+    async def xss_executed(page, marker: str) -> ValidationResult:
         try:
-            fired = page.evaluate(f"() => window.__xss_fired__ === '{marker}'")
+            fired = await page.evaluate(f"() => window.__xss_fired__ === '{marker}'")
             if fired:
                 return ValidationResult(
                     confirmed=True,
@@ -226,10 +226,10 @@ class Validator:
         return ValidationResult(confirmed=False, evidence={}, notes="SSTI not confirmed")
 
     @staticmethod
-    def oob_callback_received(oob_server, token: str, timeout: int = 10) -> ValidationResult:
-        import time
-        start = time.time()
-        while time.time() - start < timeout:
+    async def oob_callback_received(oob_server, token: str, timeout: int = 10) -> ValidationResult:
+        import asyncio
+        start = asyncio.get_event_loop().time()
+        while asyncio.get_event_loop().time() - start < timeout:
             callback = oob_server.get_callback(token)
             if callback:
                 return ValidationResult(
@@ -237,5 +237,5 @@ class Validator:
                     evidence={"callback": callback},
                     notes=f"OOB callback received: {callback.get('type', 'unknown')}"
                 )
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
         return ValidationResult(confirmed=False, evidence={}, notes="No OOB callback received")

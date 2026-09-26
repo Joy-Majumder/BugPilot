@@ -30,6 +30,7 @@ dependencies = [
     "publicsuffix2==2.20191221",
     "pyyaml==6.0.1",
     "rich==13.9.4",
+    "click>=8.1.7,<8.2.0",
     "tenacity==8.5.0",
 ]
 
@@ -45,9 +46,9 @@ dev = [
 [project.scripts]
 bughunter = "cli:app"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["app*"]
+[tool.setuptools]
+py-modules = ["cli"]
+packages = ["app"]
 
 [tool.black]
 line-length = 100

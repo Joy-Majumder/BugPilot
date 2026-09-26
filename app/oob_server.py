@@ -20,6 +20,8 @@ class OOBServer:
         self._lock = threading.Lock()
         self._http_runner = None
         self._dns_thread = None
+        self._dns_sock = None
+        self._dns_disabled = False
         self._running = False
 
     def generate_token(self) -> str:
@@ -38,6 +40,9 @@ class OOBServer:
             }
 
     async def start(self):
+        if self._running:
+            return
+
         self._running = True
 
         app = web.Application()
@@ -54,9 +59,20 @@ class OOBServer:
         self._dns_thread.start()
 
     async def stop(self):
+        if not self._running:
+            return
         self._running = False
+        if self._dns_sock:
+            try:
+                self._dns_sock.close()
+            except Exception:
+                pass
         if self._http_runner:
-            await self._http_runner.cleanup()
+            try:
+                await self._http_runner.cleanup()
+            except Exception:
+                pass
+            self._http_runner = None
 
     async def _handle_http_callback(self, request: web.Request) -> web.Response:
         token = request.match_info.get("token", "")
@@ -83,8 +99,17 @@ class OOBServer:
 
     def _run_dns_server(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(("0.0.0.0", self.dns_port))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind(("0.0.0.0", self.dns_port))
+        except OSError as e:
+            # Port in use, disable DNS server
+            print(f"[OOB] DNS port {self.dns_port} unavailable: {e}. DNS callbacks disabled.")
+            self._dns_disabled = True
+            return
         sock.settimeout(1.0)
+        self._dns_disabled = False
+        self._dns_sock = sock
 
         while self._running:
             try:
@@ -118,6 +143,8 @@ class OOBServer:
             except socket.timeout:
                 continue
             except Exception:
+                if not self._running:
+                    break
                 continue
 
 

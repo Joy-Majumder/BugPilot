@@ -21,14 +21,18 @@ git clone <this-repo> bughunter
 cd bughunter
 ./bootstrap.sh
 
-# Start web UI
-source venv/bin/activate
-python app/server.py
+# Start the web UI
+bughunter serve
 # Open http://127.0.0.1:8080
 
-# Or use CLI
-bughunter scan https://example.com
-bughunter serve
+# Or run interactively (no args = menu)
+bughunter
+
+# Or use CLI commands directly
+bughunter scan --target https://example.com
+bughunter list-scans
+bughunter findings --scan-id 1
+bughunter report --finding-id 1 --format bugcrowd
 ```
 
 ## Directory Structure
@@ -123,6 +127,28 @@ OOB_HTTP_PORT=8081
 OOB_DNS_PORT=5353
 SERVER_HOST=127.0.0.1
 SERVER_PORT=8080
+```
+
+## CLI Usage
+
+```bash
+# Interactive menu (run with no arguments)
+bughunter
+
+# Run a scan
+bughunter scan --target https://example.com --name "My Scan" --detectors sqli,ssrf --rate-limit 10 --concurrency 5
+
+# List all scans
+bughunter list-scans
+
+# View findings for a scan
+bughunter findings --scan-id 1
+
+# Generate a report for a finding
+bughunter report --finding-id 1 --format hackerone  # or bugcrowd
+
+# Start web UI
+bughunter serve  # or: bughunter serve --port 9090
 ```
 
 ## Adding Custom Payloads

@@ -12,7 +12,7 @@ class ReportGenerator:
     def __init__(self):
         self.reports_dir = settings.REPORTS_DIR
 
-    def generate(self, finding: FindingModel, format: str = "hackerone") -> str:
+    def generate(self, finding: FindingModel, format: str = "hackerone", target_url: str = None) -> str:
         finding_dict = {
             "id": finding.id,
             "vuln_class": finding.vuln_class,
@@ -39,7 +39,10 @@ class ReportGenerator:
         else:
             content = render_hackerone(finding_dict)
 
-        target_dir = self.reports_dir / finding.scan_session.target_url.replace("://", "_").replace("/", "_") / datetime.utcnow().strftime("%Y%m%d")
+        # Use provided target_url or fallback to finding.endpoint
+        base_url = target_url or finding.endpoint
+        safe_url = base_url.replace("://", "_").replace("/", "_").replace(":", "_")
+        target_dir = self.reports_dir / safe_url / datetime.utcnow().strftime("%Y%m%d")
         target_dir.mkdir(parents=True, exist_ok=True)
 
         filename = f"finding_{finding.id}_{finding.vuln_class.lower().replace(' ', '_')}.md"
@@ -62,6 +65,6 @@ class ReportGenerator:
         return "P5"
 
 
-def generate_report(finding: FindingModel, format: str = "hackerone") -> str:
+def generate_report(finding: FindingModel, format: str = "hackerone", target_url: str = None) -> str:
     generator = ReportGenerator()
-    return generator.generate(finding, format)
+    return generator.generate(finding, format, target_url)

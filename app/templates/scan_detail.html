@@ -6,58 +6,54 @@
     <title>{{ scan.target_url }} - BugHunter</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.6; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid #30363d; margin-bottom: 30px; flex-wrap: wrap; gap: 16px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.6; min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
+        header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
         h1 { font-size: 1.5rem; font-weight: 600; color: #f0f6fc; }
         .scan-meta { display: flex; gap: 24px; color: #8b949e; font-size: 14px; }
-        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; text-decoration: none; }
-        .btn-primary { background: #238636; color: white; border-color: #238636; }
-        .btn-primary:hover { background: #2ea043; border-color: #2ea043; }
-        .btn-secondary { background: #21262d; color: #e6edf3; border-color: #30363d; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; }
+        .btn-primary { background: #238636; color: white; }
+        .btn-primary:hover { background: #2ea043; }
+        .btn-secondary { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
         .btn-secondary:hover { background: #30363d; }
-        .btn-danger { background: #da3633; color: white; border-color: #da3633; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
-        .card-title { font-size: 1.1rem; font-weight: 600; }
-        .severity-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+        .severity { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
         .sev-critical { background: #da3633; color: white; }
         .sev-high { background: #f85149; color: white; }
         .sev-medium { background: #d29922; color: black; }
         .sev-low { background: #238636; color: white; }
         .sev-info { background: #58a6ff; color: white; }
-        .confidence-badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+        .confidence { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; margin-left: 8px; }
         .conf-confirmed { background: #238636; color: white; }
         .conf-suspected { background: #9e6a03; color: white; }
-        .finding-table { width: 100%; border-collapse: collapse; }
-        .finding-table th, .finding-table td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
-        .finding-table th { color: #8b949e; font-weight: 600; font-size: 12px; text-transform: uppercase; }
-        .finding-table tr:hover { background: #1c2128; }
-        .finding-table tr td:first-child { width: 40px; }
-        .endpoint-cell { font-family: monospace; font-size: 13px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
+        th { color: #8b949e; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+        tr:hover { background: #1c2128; }
+        .endpoint { font-family: monospace; font-size: 12px; max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal.active { display: flex; }
+        .modal-content { background: #161b22; border: 1px solid #30363d; border-radius: 12px; width: 100%; max-width: 900px; max-height: 85vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #30363d; }
+        .modal-close { background: none; border: none; color: #8b949e; font-size: 28px; cursor: pointer; line-height: 1; }
+        .modal-body { padding: 24px; }
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 13px; font-weight: 600; color: #e6edf3; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .evidence-box { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 16px; }
+        .grid-item { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+        .grid-label { font-size: 11px; color: #8b949e; text-transform: uppercase; margin-bottom: 4px; }
+        .grid-value { font-family: monospace; font-size: 13px; word-break: break-all; }
         .tabs { display: flex; border-bottom: 1px solid #30363d; margin-bottom: 16px; }
-        .tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; color: #8b949e; }
+        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; color: #8b949e; font-size: 13px; font-weight: 500; }
         .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .evidence-box { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-        .section { margin-bottom: 24px; }
-        .section-title { font-size: 14px; font-weight: 600; color: #e6edf3; margin-bottom: 8px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
-        .modal.active { display: flex; }
-        .modal-content { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; width: 90%; max-width: 900px; max-height: 85vh; overflow-y: auto; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .modal-close { background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; }
-        .report-preview { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; max-height: 60vh; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+        .report-preview { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 20px; max-height: 60vh; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
         .report-preview h1, .report-preview h2, .report-preview h3 { color: #58a6ff; margin: 16px 0 8px; }
         .report-preview code { background: #21262d; padding: 2px 6px; border-radius: 4px; }
         .report-preview pre { background: #0d1117; padding: 12px; border-radius: 6px; overflow-x: auto; border: 1px solid #30363d; }
-        .filter-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
-        .filter-bar select, .filter-bar input { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; padding: 6px 12px; font-size: 14px; }
-        .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
-        .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; text-align: center; }
-        .stat-value { font-size: 2rem; font-weight: 700; color: #58a6ff; }
-        .stat-label { font-size: 12px; color: #8b949e; text-transform: uppercase; }
+        .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #30363d; }
     </style>
 </head>
 <body>
@@ -72,66 +68,17 @@
                     {% if scan.completed_at %}<span>Completed: {{ scan.completed_at.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
                 </div>
             </div>
-            <div style="display: flex; gap: 12px;">
-                <button class="btn btn-primary" onclick="startScan()">Start Scan</button>
-                <a href="/" class="btn btn-secondary">Back to Dashboard</a>
-            </div>
+            <a href="/" class="btn btn-secondary">← Back</a>
         </header>
 
-        <div class="stat-cards">
-            <div class="stat-card">
-                <div class="stat-value" id="statTotal">{{ findings|length }}</div>
-                <div class="stat-label">Total Findings</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value sev-critical" id="statCritical">{{ findings|selectattr('severity', 'equalto', 'critical')|list|length }}</div>
-                <div class="stat-label">Critical</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value sev-high" id="statHigh">{{ findings|selectattr('severity', 'equalto', 'high')|list|length }}</div>
-                <div class="stat-label">High</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value sev-medium" id="statMedium">{{ findings|selectattr('severity', 'equalto', 'medium')|list|length }}</div>
-                <div class="stat-label">Medium</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value sev-low" id="statLow">{{ findings|selectattr('severity', 'equalto', 'low')|list|length }}</div>
-                <div class="stat-label">Low</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="statConfirmed">{{ findings|selectattr('confidence', 'equalto', 'confirmed')|list|length }}</div>
-                <div class="stat-label">Confirmed</div>
-            </div>
-        </div>
-
         <div class="card">
-            <div class="card-header">
-                <span class="card-title">Findings</span>
-                <div class="filter-bar">
-                    <select id="confidenceFilter" onchange="filterTable()">
-                        <option value="">All Confidence</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="suspected">Suspected</option>
-                    </select>
-                    <select id="severityFilter" onchange="filterTable()">
-                        <option value="">All Severity</option>
-                        <option value="critical">Critical</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                        <option value="info">Info</option>
-                    </select>
-                    <input type="text" id="searchFilter" placeholder="Search findings..." oninput="filterTable()">
-                </div>
-            </div>
-            <table class="finding-table" id="findingTable">
+            <table>
                 <thead>
                     <tr>
                         <th>#</th>
                         <th>Severity</th>
                         <th>Confidence</th>
-                        <th>Class</th>
+                        <th>Type</th>
                         <th>Endpoint</th>
                         <th>Method</th>
                         <th>Param</th>
@@ -141,21 +88,23 @@
                 </thead>
                 <tbody>
                     {% for finding in findings %}
-                    <tr data-severity="{{ finding.severity }}" data-confidence="{{ finding.confidence }}" data-class="{{ finding.vuln_class }}">
+                    <tr>
                         <td>{{ finding.id }}</td>
-                        <td><span class="severity-badge sev-{{ finding.severity }}">{{ finding.severity }}</span></td>
-                        <td><span class="confidence-badge conf-{{ finding.confidence }}">{{ finding.confidence }}</span></td>
+                        <td><span class="severity sev-{{ finding.severity }}">{{ finding.severity }}</span></td>
+                        <td><span class="confidence conf-{{ finding.confidence }}">{{ finding.confidence }}</span></td>
                         <td>{{ finding.vuln_class }}</td>
-                        <td class="endpoint-cell" title="{{ finding.endpoint }}">{{ finding.endpoint }}</td>
+                        <td class="endpoint" title="{{ finding.endpoint }}">{{ finding.endpoint }}</td>
                         <td>{{ finding.method }}</td>
                         <td>{{ finding.param or '-' }}</td>
                         <td>{{ '%.1f'|format(finding.cvss_score / 10) if finding.cvss_score else 'N/A' }}</td>
                         <td>
-                            <button class="btn btn-secondary" onclick="viewFinding({{ finding.id }})" style="padding: 4px 8px; font-size: 12px;">View</button>
-                            <button class="btn btn-primary" onclick="generateReport({{ finding.id }}, 'hackerone')" style="padding: 4px 8px; font-size: 12px;">H1</button>
-                            <button class="btn btn-secondary" onclick="generateReport({{ finding.id }}, 'bugcrowd')" style="padding: 4px 8px; font-size: 12px;">BC</button>
+                            <button class="btn btn-secondary" onclick="viewFinding({{ finding.id }})" style="padding: 6px 12px; font-size: 12px;">View</button>
+                            <button class="btn btn-primary" onclick="generateReport({{ finding.id }}, 'hackerone')" style="padding: 6px 12px; font-size: 12px;">H1</button>
+                            <button class="btn btn-secondary" onclick="generateReport({{ finding.id }}, 'bugcrowd')" style="padding: 6px 12px; font-size: 12px;">BC</button>
                         </td>
                     </tr>
+                    {% else %}
+                    <tr><td colspan="9" style="text-align: center; color: #8b949e; padding: 40px;">No findings yet</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -165,154 +114,97 @@
     <div class="modal" id="findingModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="findingModalTitle">Finding Details</h2>
-                <button class="modal-close" onclick="closeFindingModal()">&times;</button>
+                <h2 id="modalTitle">Finding Details</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
-            <div id="findingModalContent"></div>
+            <div class="modal-body" id="modalBody"></div>
         </div>
     </div>
 
     <div class="modal" id="reportModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="reportModalTitle">Report Preview</h2>
+                <h2>Report Preview</h2>
                 <button class="modal-close" onclick="closeReportModal()">&times;</button>
             </div>
             <div class="tabs">
-                <div class="tab active" onclick="switchReportTab('hackerone')">HackerOne</div>
-                <div class="tab" onclick="switchReportTab('bugcrowd')">Bugcrowd</div>
+                <div class="tab active" onclick="switchTab('hackerone')">HackerOne</div>
+                <div class="tab" onclick="switchTab('bugcrowd')">Bugcrowd</div>
             </div>
-            <div class="tab-content active" id="reportHackerOne"></div>
-            <div class="tab-content" id="reportBugcrowd"></div>
-            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
-                <button class="btn btn-secondary" onclick="downloadReport('hackerone')">Download HackerOne</button>
-                <button class="btn btn-secondary" onclick="downloadReport('bugcrowd')">Download Bugcrowd</button>
-                <button class="btn btn-primary" onclick="copyReport()">Copy to Clipboard</button>
+            <div class="tab-content active" id="tab-hackerone"></div>
+            <div class="tab-content" id="tab-bugcrowd"></div>
+            <div class="actions">
+                <button class="btn btn-secondary" onclick="downloadReport('hackerone')">Download H1</button>
+                <button class="btn btn-secondary" onclick="downloadReport('bugcrowd')">Download BC</button>
+                <button class="btn btn-primary" onclick="copyReport()">Copy</button>
             </div>
         </div>
     </div>
 
     <script>
-        const findingsData = {{ findings|tojson }};
         let currentFindingId = null;
         let currentReportFormat = 'hackerone';
 
-        async function startScan() {
-            const resp = await fetch(`/api/scans/{{ scan.id }}/start`, { method: 'POST' });
-            if (resp.ok) {
-                location.reload();
-            }
-        }
-
-        function filterTable() {
-            const confidence = document.getElementById('confidenceFilter').value;
-            const severity = document.getElementById('severityFilter').value;
-            const search = document.getElementById('searchFilter').value.toLowerCase();
-
-            document.querySelectorAll('#findingTable tbody tr').forEach(row => {
-                const matchConfidence = !confidence || row.dataset.confidence === confidence;
-                const matchSeverity = !severity || row.dataset.severity === severity;
-                const matchSearch = !search ||
-                    row.textContent.toLowerCase().includes(search);
-
-                row.style.display = (matchConfidence && matchSeverity && matchSearch) ? '' : 'none';
-            });
-        }
-
-        async function viewFinding(findingId) {
-            currentFindingId = findingId;
-            const resp = await fetch(`/api/findings/${findingId}`);
-            const finding = await resp.json();
-            renderFindingModal(finding);
+        async function viewFinding(id) {
+            currentFindingId = id;
+            const resp = await fetch(`/api/findings/${id}`);
+            const f = await resp.json();
+            document.getElementById('modalTitle').textContent = `${f.vuln_class} #${f.id}`;
+            document.getElementById('modalBody').innerHTML = `
+                <div class="section">
+                    <div class="section-title">Overview</div>
+                    <div class="grid">
+                        <div class="grid-item"><div class="grid-label">Type</div><div class="grid-value">${f.vuln_class}</div></div>
+                        <div class="grid-item"><div class="grid-label">Endpoint</div><div class="grid-value">${f.endpoint}</div></div>
+                        <div class="grid-item"><div class="grid-label">Method</div><div class="grid-value">${f.method}</div></div>
+                        <div class="grid-item"><div class="grid-label">Parameter</div><div class="grid-value">${f.param || 'N/A'}</div></div>
+                        <div class="grid-item"><div class="grid-label">Confidence</div><div class="grid-value"><span class="confidence conf-${f.confidence}">${f.confidence}</span></div></div>
+                        <div class="grid-item"><div class="grid-label">Severity</div><div class="grid-value"><span class="severity sev-${f.severity}">${f.severity}</span></div></div>
+                        <div class="grid-item"><div class="grid-label">CVSS</div><div class="grid-value">${f.cvss_score} (${f.cvss_vector})</div></div>
+                        <div class="grid-item"><div class="grid-label">VRT</div><div class="grid-value">${f.bugcrowd_vrt_category || 'N/A'}</div></div>
+                    </div>
+                </div>
+                <div class="section"><div class="section-title">Summary</div><div>${f.summary || 'N/A'}</div></div>
+                <div class="section"><div class="section-title">Description</div><div>${f.description || 'N/A'}</div></div>
+                <div class="section"><div class="section-title">Steps to Reproduce</div><div class="evidence-box">${f.steps_to_reproduce || 'N/A'}</div></div>
+                <div class="section"><div class="section-title">Impact</div><div>${f.impact || 'N/A'}</div></div>
+                <div class="section"><div class="section-title">Remediation</div><div>${f.remediation || 'N/A'}</div></div>
+                <div class="section"><div class="section-title">Evidence</div><div class="evidence-box">${JSON.stringify(f.evidence, null, 2)}</div></div>
+            `;
             document.getElementById('findingModal').classList.add('active');
         }
 
-        function renderFindingModal(f) {
-            const content = document.getElementById('findingModalContent');
-            content.innerHTML = `
-                <div class="section">
-                    <div class="section-title">Overview</div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                        <div><strong>Vulnerability Class:</strong> ${f.vuln_class}</div>
-                        <div><strong>Endpoint:</strong> <code class="endpoint-cell" style="display:block; word-break: break-all;">${f.endpoint}</code></div>
-                        <div><strong>Method:</strong> ${f.method}</div>
-                        <div><strong>Parameter:</strong> ${f.param || 'N/A'}</div>
-                        <div><strong>Confidence:</strong> <span class="confidence-badge conf-${f.confidence}">${f.confidence}</span></div>
-                        <div><strong>Severity:</strong> <span class="severity-badge sev-${f.severity}">${f.severity}</span></div>
-                        <div><strong>CVSS:</strong> ${f.cvss_score} (${f.cvss_vector})</div>
-                        <div><strong>VRT Category:</strong> ${f.bugcrowd_vrt_category || 'N/A'}</div>
-                    </div>
-                </div>
-                <div class="section">
-                    <div class="section-title">Summary</div>
-                    <div>${f.summary || 'No summary'}</div>
-                </div>
-                <div class="section">
-                    <div class="section-title">Description</div>
-                    <div>${f.description || 'No description'}</div>
-                </div>
-                <div class="section">
-                    <div class="section-title">Steps to Reproduce</div>
-                    <div class="evidence-box">${f.steps_to_reproduce || 'No steps provided'}</div>
-                </div>
-                <div class="section">
-                    <div class="section-title">Impact</div>
-                    <div>${f.impact || 'No impact description'}</div>
-                </div>
-                <div class="section">
-                    <div class="section-title">Remediation</div>
-                    <div>${f.remediation || 'No remediation provided'}</div>
-                </div>
-                <div class="section">
-                    <div class="section-title">Evidence</div>
-                    <div class="evidence-box">${JSON.stringify(f.evidence, null, 2)}</div>
-                </div>
-            `;
-        }
-
-        function closeFindingModal() {
+        function closeModal() {
             document.getElementById('findingModal').classList.remove('active');
         }
 
-        async function generateReport(findingId, format) {
-            currentFindingId = findingId;
+        async function generateReport(id, format) {
+            currentFindingId = id;
             currentReportFormat = format;
-
-            const resp = await fetch(`/api/findings/${findingId}/report`, {
+            const resp = await fetch(`/api/findings/${id}/report`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `format=${format}`
             });
-
             const result = await resp.json();
             if (result.report_path) {
                 await loadReport(result.report_path, format);
                 document.getElementById('reportModal').classList.add('active');
-                switchReportTab(format);
+                switchTab(format);
             }
         }
 
         async function loadReport(path, format) {
             const resp = await fetch(`/api/findings/${currentFindingId}/report/download?format=${format}`);
             const text = await resp.text();
-
-            if (format === 'hackerone') {
-                document.getElementById('reportHackerOne').innerHTML = `<pre class="report-preview">${escapeHtml(text)}</pre>`;
-            } else {
-                document.getElementById('reportBugcrowd').innerHTML = `<pre class="report-preview">${escapeHtml(text)}</pre>`;
-            }
+            document.getElementById(`tab-${format}`).innerHTML = `<pre class="report-preview">${escapeHtml(text)}</pre>`;
         }
 
-        function switchReportTab(format) {
+        function switchTab(format) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-
-            const tab = document.querySelector(`.tab[onclick*="${format}"]`);
-            const content = document.getElementById(`report${format.charAt(0).toUpperCase() + format.slice(1)}`);
-
-            if (tab) tab.classList.add('active');
-            if (content) content.classList.add('active');
-
+            document.querySelector(`.tab[onclick*="${format}"]`).classList.add('active');
+            document.getElementById(`tab-${format}`).classList.add('active');
             currentReportFormat = format;
         }
 
@@ -321,10 +213,9 @@
         }
 
         async function copyReport() {
-            const contentEl = document.getElementById(currentReportFormat === 'hackerone' ? 'reportHackerOne' : 'reportBugcrowd');
-            const text = contentEl.textContent;
-            await navigator.clipboard.writeText(text);
-            alert('Report copied to clipboard!');
+            const el = document.getElementById(currentReportFormat === 'hackerone' ? 'tab-hackerone' : 'tab-bugcrowd');
+            await navigator.clipboard.writeText(el.textContent);
+            alert('Copied!');
         }
 
         function closeReportModal() {

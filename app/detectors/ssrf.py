@@ -156,7 +156,7 @@ class SSRFDetector(Detector):
         if not test:
             return None
 
-        validation = Validator.oob_callback_received(self.oob_server, token, timeout=15)
+        validation = await Validator.oob_callback_received(self.oob_server, token, timeout=15)
         if validation.confirmed:
             callback = validation.evidence.get("callback", {})
             return self._make_finding(
@@ -252,7 +252,7 @@ class SSRFDetector(Detector):
             test = await self._fetch(test_url)
             
             if test:
-                validation = Validator.oob_callback_received(self.oob_server, token, timeout=10)
+                validation = await Validator.oob_callback_received(self.oob_server, token, timeout=10)
                 if validation.confirmed:
                     return self._make_finding(
                         endpoint=endpoint,
@@ -330,36 +330,40 @@ class SSRFDetector(Detector):
                     )
         return None
 
+    def apply_bypasses(self, ip: str) -> List[str]:
+        """Apply all bypass techniques to an IP address, returning unique bypass strings."""
+        results = []
+        for technique_name, technique_func in self.BYPASS_TECHNIQUES.items():
+            try:
+                bypassed = technique_func(ip)
+                if bypassed != ip:
+                    results.append(bypassed)
+            except Exception:
+                pass
+        return results
+
     async def _test_waf_bypasses(self, endpoint: Endpoint, param: str) -> Optional[Finding]:
         """Test PortSwigger-style WAF bypasses"""
         if not self.oob_server:
             return None
 
-        base_url = f"http://127.0.0.1"
-        
-        for technique_name, technique_func in self.BYPASS_TECHNIQUES.items():
-            try:
-                bypassed_ip = technique_func(base_url.replace("http://", ""))
-                if bypassed_ip == base_url.replace("http://", ""):
-                    continue
-                
-                token = self.oob_server.generate_token()
-                oob_url = f"http://{token}.{self.oob_server.domain}"
-                
-                # Combine bypass with OOB
-                if technique_name in ["url_auth", "subdomain"]:
-                    payload = technique_func(oob_url.replace("http://", ""))
-                else:
-                    payload = f"http://{bypassed_ip}"
-                    # Also try with OOB
-                    payload = f"http://{bypassed_ip}@{oob_url}" if "@" not in bypassed_ip else bypassed_ip
-                
+        base_ip = "127.0.0.1"
+        bypass_payloads = self.apply_bypasses(base_ip)
+
+        for bypassed_ip in bypass_payloads:
+            token = self.oob_server.generate_token()
+            oob_url = f"http://{token}.{self.oob_server.domain}"
+
+            for payload in [
+                f"http://{bypassed_ip}",
+                f"http://{bypassed_ip}@{oob_url}",
+            ]:
                 test_url = endpoint.with_param(param, payload)
                 test = await self._fetch(test_url)
                 if not test:
                     continue
 
-                validation = Validator.oob_callback_received(self.oob_server, token, timeout=10)
+                validation = await Validator.oob_callback_received(self.oob_server, token, timeout=10)
                 if validation.confirmed:
                     return self._make_finding(
                         endpoint=endpoint,
@@ -368,22 +372,20 @@ class SSRFDetector(Detector):
                         evidence={
                             "payload": payload,
                             "type": "ssrf_waf_bypass",
-                            "technique": technique_name,
                             "bypassed_ip": bypassed_ip,
                             "token": token,
                             "callback": validation.evidence.get("callback"),
                         },
-                        summary=f"SSRF with WAF bypass ({technique_name}) in parameter '{param}'",
+                        summary=f"SSRF with WAF bypass in parameter '{param}'",
                         description=(
-                            f"The parameter '{param}' has SSRF protection that can be bypassed using "
-                            f"{technique_name} technique. The server fetches the attacker-controlled URL."
+                            f"The parameter '{param}' has SSRF protection that can be bypassed "
+                            f"using IP obfuscation ({bypassed_ip}). The server fetches the "
+                            f"attacker-controlled URL."
                         ),
                         steps_to_reproduce=(f"1. Send bypass payload: {payload}\n2. Observe OOB callback"),
                         impact="WAF bypass allows access to internal services despite protection.",
                         remediation="Use proper URL parsing and validation. Resolve hostnames and check IP against denylist. Don't rely on string matching.",
                     )
-            except Exception:
-                pass
         return None
 
     async def _test_dns_rebinding(self, endpoint: Endpoint, param: str) -> Optional[Finding]:
@@ -403,7 +405,7 @@ class SSRFDetector(Detector):
             return None
 
         # Check for multiple requests (indicating rebinding potential)
-        validation = Validator.oob_callback_received(self.oob_server, token, timeout=20)
+        validation = await Validator.oob_callback_received(self.oob_server, token, timeout=20)
         if validation.confirmed:
             callback = validation.evidence.get("callback", {})
             # Note: True DNS rebinding detection requires multiple callbacks with different IPs
@@ -776,53 +778,68 @@ class HTTPRequestSmugglingDetector(Detector):
 
     async def _test_smuggling(self, endpoint: Endpoint, variant: str, payload: str) -> Optional[Finding]:
         try:
-            parsed = urlparse(endpoint.url)
-            host = parsed.hostname
-            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            result = await asyncio.wait_for(
+                asyncio.to_thread(self._send_smuggling_payload, endpoint, payload),
+                timeout=15,
+            )
+        except (asyncio.TimeoutError, Exception):
+            return None
 
-            sock = socket.create_connection((host, port), timeout=10)
-            if parsed.scheme == "https":
-                import ssl
-                sock = ssl.create_default_context().wrap_socket(sock, server_hostname=host)
+        if not result:
+            return None
 
-            sock.sendall(payload.encode())
-            response = sock.recv(8192).decode(errors="ignore")
-            sock.close()
+        response, indicators = result
 
-            # Check for desync indicators
-            indicators = [
-                "SMUGGLED" in response,
-                "SMUG" in response,
-                "400" not in response and "500" not in response,
-                "unexpected" in response.lower(),
-                "malformed" in response.lower(),
-            ]
+        if any(indicators):
+            return self._make_finding(
+                endpoint=endpoint,
+                param=None,
+                confidence="suspected",
+                evidence={
+                    "variant": variant,
+                    "payload": payload[:200],
+                    "response_snippet": response[:500],
+                    "indicators": [i for i, v in enumerate(indicators) if v],
+                    "note": "Differential response suggests desync; manual verification required",
+                },
+                summary=f"Potential HTTP Request Smuggling ({variant})",
+                description=(
+                    f"The server may be vulnerable to {variant} HTTP request smuggling. "
+                    f"Ambiguous Content-Length and Transfer-Encoding headers can cause "
+                    f"front-end/back-end desynchronization."
+                ),
+                steps_to_reproduce=(f"1. Send crafted {variant} request\n2. Observe desynchronized responses"),
+                impact="Request smuggling can bypass security controls, poison cache, and hijack sessions.",
+                remediation="Use HTTP/2 end-to-end. Reject requests with both CL and TE. Normalize headers. Upgrade frontend/backend.",
+            )
 
-            if any(indicators):
-                return self._make_finding(
-                    endpoint=endpoint,
-                    param=None,
-                    confidence="suspected",
-                    evidence={
-                        "variant": variant,
-                        "payload": payload[:200],
-                        "response_snippet": response[:500],
-                        "indicators": [i for i, v in enumerate(indicators) if v],
-                        "note": "Differential response suggests desync; manual verification required",
-                    },
-                    summary=f"Potential HTTP Request Smuggling ({variant})",
-                    description=(
-                        f"The server may be vulnerable to {variant} HTTP request smuggling. "
-                        f"Ambiguous Content-Length and Transfer-Encoding headers can cause "
-                        f"front-end/back-end desynchronization."
-                    ),
-                    steps_to_reproduce=(f"1. Send crafted {variant} request\n2. Observe desynchronized responses"),
-                    impact="Request smuggling can bypass security controls, poison cache, and hijack sessions.",
-                    remediation="Use HTTP/2 end-to-end. Reject requests with both CL and TE. Normalize headers. Upgrade frontend/backend.",
-                )
-        except Exception:
-            pass
         return None
+
+    def _send_smuggling_payload(self, endpoint: Endpoint, payload: str) -> Optional[tuple]:
+        """Synchronous socket operation - run via asyncio.to_thread."""
+        parsed = urlparse(endpoint.url)
+        host = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+
+        sock = socket.create_connection((host, port), timeout=10)
+        if parsed.scheme == "https":
+            import ssl
+            sock = ssl.create_default_context().wrap_socket(sock, server_hostname=host)
+        sock.settimeout(10)
+
+        sock.sendall(payload.encode())
+        response = sock.recv(8192).decode(errors="ignore")
+        sock.close()
+
+        indicators = [
+            "SMUGGLED" in response,
+            "SMUG" in response,
+            "400" not in response and "500" not in response,
+            "unexpected" in response.lower(),
+            "malformed" in response.lower(),
+        ]
+
+        return response, indicators
 
 
 class XXEDetector(Detector):
@@ -941,7 +958,7 @@ class XXEDetector(Detector):
                     )
 
             elif xxe_type in ["oob", "parameter_entity"]:
-                validation = Validator.oob_callback_received(self.oob_server, token, timeout=15)
+                validation = await Validator.oob_callback_received(self.oob_server, token, timeout=15)
                 if validation.confirmed:
                     callback = validation.evidence.get("callback", {})
                     return self._make_finding(

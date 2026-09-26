@@ -24,6 +24,7 @@ templates = Jinja2Templates(directory="app/templates")
 init_db()
 
 active_scans: Dict[int, ScanPipeline] = {}
+active_tasks: Dict[int, asyncio.Task] = {}
 websocket_connections: Dict[int, List[WebSocket]] = {}
 
 
@@ -75,36 +76,39 @@ async def scan_detail(request: Request, scan_id: int):
 @app.post("/api/scans")
 async def create_scan(scan_req: ScanCreateRequest):
     db = get_db_session()
-    scan = ScanSession(
-        target_url=scan_req.target_url,
-        name=scan_req.name or scan_req.target_url,
-        config={
-            "scope": scan_req.scope,
-            "detectors": scan_req.detectors,
-            "rate_limit": scan_req.rate_limit,
-            "concurrency": scan_req.concurrency,
-        },
-        status=ScanStatus.PENDING,
-    )
-    db.add(scan)
-    db.commit()
-    db.refresh(scan)
-
-    for auth in scan_req.auth_sessions:
-        auth_session = AuthSession(
-            scan_session_id=scan.id,
-            name=auth["name"],
-            type=auth["type"],
-            cookies=auth.get("cookies", {}),
-            headers=auth.get("headers", {}),
-            tokens=auth.get("tokens", {}),
-            login_flow=auth.get("login_flow", {}),
+    try:
+        scan = ScanSession(
+            target_url=scan_req.target_url,
+            name=scan_req.name or scan_req.target_url,
+            config={
+                "scope": scan_req.scope,
+                "detectors": scan_req.detectors,
+                "rate_limit": scan_req.rate_limit,
+                "concurrency": scan_req.concurrency,
+            },
+            status=ScanStatus.PENDING,
         )
-        db.add(auth_session)
-    db.commit()
+        db.add(scan)
+        db.commit()
+        db.refresh(scan)
+        scan_id = scan.id
 
-    db.close()
-    return {"scan_id": scan.id, "status": "created"}
+        for auth in scan_req.auth_sessions:
+            auth_session = AuthSession(
+                scan_session_id=scan_id,
+                name=auth["name"],
+                type=auth["type"],
+                cookies=auth.get("cookies", {}),
+                headers=auth.get("headers", {}),
+                tokens=auth.get("tokens", {}),
+                login_flow=auth.get("login_flow", {}),
+            )
+            db.add(auth_session)
+        db.commit()
+
+        return {"scan_id": scan_id, "status": "created"}
+    finally:
+        db.close()
 
 
 @app.post("/api/scans/{scan_id}/start")
@@ -125,7 +129,8 @@ async def start_scan(scan_id: int):
     await pipeline.initialize()
     active_scans[scan_id] = pipeline
 
-    asyncio.create_task(run_scan_with_cleanup(scan_id, pipeline))
+    task = asyncio.create_task(run_scan_with_cleanup(scan_id, pipeline))
+    active_tasks[scan_id] = task
 
     return {"status": "started"}
 
@@ -136,9 +141,16 @@ async def run_scan_with_cleanup(scan_id: int, pipeline: ScanPipeline):
             await broadcast_progress(scan_id, msg, percent)
 
         await pipeline.run(progress_callback)
+    except Exception as e:
+        if pipeline.scan_session:
+            pipeline.scan_session.status = ScanStatus.FAILED
+            pipeline.scan_session.error_message = str(e)
+            pipeline.scan_session.completed_at = datetime.utcnow()
+            pipeline.db.commit()
     finally:
         await pipeline.cleanup()
         active_scans.pop(scan_id, None)
+        active_tasks.pop(scan_id, None)
 
 
 @app.post("/api/scans/{scan_id}/stop")
@@ -151,6 +163,39 @@ async def stop_scan(scan_id: int):
         active_scans.pop(scan_id, None)
         return {"status": "stopped"}
     raise HTTPException(404, "Scan not running")
+
+
+@app.delete("/api/scans/{scan_id}")
+async def delete_scan(scan_id: int):
+    db = get_db_session()
+    try:
+        # Stop if running
+        pipeline = active_scans.get(scan_id)
+        if pipeline:
+            await pipeline.cleanup()
+            active_scans.pop(scan_id, None)
+
+        scan = db.query(ScanSession).filter(ScanSession.id == scan_id).first()
+        if not scan:
+            db.close()
+            raise HTTPException(404, "Scan not found")
+
+        # Delete related data (cascade should handle, but explicit for safety)
+        db.query(AuthSession).filter(AuthSession.scan_session_id == scan_id).delete()
+        db.query(CrawlData).filter(CrawlData.scan_session_id == scan_id).delete()
+        db.query(FindingModel).filter(FindingModel.scan_session_id == scan_id).delete()
+
+        # Delete the scan
+        db.delete(scan)
+        db.commit()
+        return {"status": "deleted", "scan_id": scan_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
 
 
 @app.websocket("/ws/scan/{scan_id}")
@@ -238,6 +283,8 @@ async def get_finding(finding_id: int):
 async def generate_finding_report(finding_id: int, format: str = Form("hackerone")):
     db = get_db_session()
     finding = db.query(FindingModel).filter(FindingModel.id == finding_id).first()
+    # Get target_url from scan_session before closing db
+    target_url = finding.scan_session.target_url if finding and finding.scan_session else None
     db.close()
 
     if not finding:
@@ -246,7 +293,7 @@ async def generate_finding_report(finding_id: int, format: str = Form("hackerone
     if format not in ("hackerone", "bugcrowd"):
         raise HTTPException(400, "Invalid format")
 
-    report_path = generate_report(finding, format)
+    report_path = generate_report(finding, format, target_url)
 
     return {"report_path": report_path, "format": format}
 
@@ -255,12 +302,13 @@ async def generate_finding_report(finding_id: int, format: str = Form("hackerone
 async def download_report(finding_id: int, format: str = "hackerone"):
     db = get_db_session()
     finding = db.query(FindingModel).filter(FindingModel.id == finding_id).first()
+    target_url = finding.scan_session.target_url if finding and finding.scan_session else None
     db.close()
 
     if not finding:
         raise HTTPException(404, "Finding not found")
 
-    report_path = generate_report(finding, format)
+    report_path = generate_report(finding, format, target_url)
     return FileResponse(report_path, filename=Path(report_path).name)
 
 
@@ -282,6 +330,31 @@ async def list_scans():
         }
         for s in scans
     ]
+
+
+@app.get("/api/scans/{scan_id}")
+async def get_scan(scan_id: int):
+    db = get_db_session()
+    scan = db.query(ScanSession).filter(ScanSession.id == scan_id).first()
+    db.close()
+    
+    if not scan:
+        raise HTTPException(404, "Scan not found")
+    
+    config = scan.config or {}
+    return {
+        "id": scan.id,
+        "target_url": scan.target_url,
+        "name": scan.name,
+        "status": scan.status.value,
+        "config": config,
+        "progress": config.get("progress_percent", 0),
+        "progress_message": config.get("progress_message", ""),
+        "created_at": scan.created_at.isoformat(),
+        "started_at": scan.started_at.isoformat() if scan.started_at else None,
+        "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+        "error_message": scan.error_message,
+    }
 
 
 @app.get("/api/payloads")
@@ -323,6 +396,31 @@ async def add_payload(payload: Dict[str, Any]):
     db.refresh(p)
     db.close()
     return {"id": p.id}
+
+
+@app.get("/api/tools/status")
+async def get_tool_status():
+    """Get status of external tools (subfinder, httpx, nuclei)"""
+    from app.config import settings
+    import subprocess
+    from pathlib import Path
+    
+    tools_dir = settings.TOOLS_DIR
+    tool_status = {}
+    
+    for tool_name in ["subfinder", "httpx", "nuclei"]:
+        tool_path = tools_dir / tool_name
+        if tool_path.exists():
+            try:
+                result = subprocess.run([str(tool_path), "-version"], capture_output=True, text=True, timeout=5)
+                version = result.stdout.strip() or result.stderr.strip()
+                tool_status[tool_name] = {"available": True, "version": version, "error": ""}
+            except Exception as e:
+                tool_status[tool_name] = {"available": True, "version": "", "error": str(e)}
+        else:
+            tool_status[tool_name] = {"available": False, "version": "", "error": "Binary not found"}
+    
+    return tool_status
 
 
 if __name__ == "__main__":

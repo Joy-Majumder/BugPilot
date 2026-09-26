@@ -12,6 +12,31 @@ class ReconModule:
     def __init__(self, http_client: httpx.AsyncClient):
         self.http_client = http_client
         self.tools_dir = settings.TOOLS_DIR
+        self.tool_status = {
+            "subfinder": {"available": False, "version": "", "error": ""},
+            "httpx": {"available": False, "version": "", "error": ""},
+            "nuclei": {"available": False, "version": "", "error": ""},
+        }
+        self._check_tools()
+
+    def _check_tools(self):
+        """Check if tools are available and get versions"""
+        for tool_name in ["subfinder", "httpx", "nuclei"]:
+            tool_path = self.tools_dir / tool_name
+            if tool_path.exists():
+                try:
+                    # Try to get version
+                    import subprocess
+                    result = subprocess.run([str(tool_path), "-version"], capture_output=True, text=True, timeout=5)
+                    version = result.stdout.strip() or result.stderr.strip()
+                    self.tool_status[tool_name] = {"available": True, "version": version, "error": ""}
+                except Exception as e:
+                    self.tool_status[tool_name] = {"available": True, "version": "", "error": str(e)}
+            else:
+                self.tool_status[tool_name] = {"available": False, "version": "", "error": "Binary not found"}
+
+    def get_tool_status(self) -> Dict:
+        return self.tool_status
 
     async def run(self, target_url: str, scope_config: Dict = None) -> Dict[str, Any]:
         parsed = urlparse(target_url)
@@ -24,23 +49,77 @@ class ReconModule:
             "tech_stack": {},
             "open_ports": [],
             "nuclei_findings": [],
+            "tool_status": self.tool_status,
+            "errors": [],
         }
 
-        subdomains = await self._run_subfinder(domain)
-        results["subdomains"] = subdomains
+        # If no tools available, do basic HTTP-based recon
+        if not any(t["available"] for t in self.tool_status.values()):
+            results["errors"].append("No external tools available, doing basic HTTP recon only")
+            return await self._basic_recon(target_url, results)
 
-        live_hosts = await self._run_httpx(subdomains)
-        results["live_hosts"] = live_hosts
+        try:
+            subdomains = await self._run_subfinder(domain)
+            results["subdomains"] = subdomains
+        except Exception as e:
+            results["errors"].append(f"subfinder: {e}")
+
+        try:
+            live_hosts = await self._run_httpx(subdomains if subdomains else [domain])
+            results["live_hosts"] = live_hosts
+        except Exception as e:
+            results["errors"].append(f"httpx: {e}")
 
         for host in live_hosts[:10]:
-            tech = await self._fingerprint_tech(host)
-            if tech:
-                results["tech_stack"][host] = tech
+            try:
+                host_url = host.get("url") if isinstance(host, dict) else host
+                tech = await self._fingerprint_tech(host_url)
+                if tech:
+                    results["tech_stack"][host_url] = tech
+            except Exception as e:
+                results["errors"].append(f"tech fingerprint ({host}): {e}")
 
-        nuclei_results = await self._run_nuclei(live_hosts[:20])
-        results["nuclei_findings"] = nuclei_results
+        try:
+            nuclei_results = await self._run_nuclei(live_hosts[:20])
+            results["nuclei_findings"] = nuclei_results
+        except Exception as e:
+            results["errors"].append(f"nuclei: {e}")
 
         return results
+
+    async def _basic_recon(self, target_url: str, results: Dict) -> Dict:
+        """Basic HTTP-based recon when tools aren't available"""
+        try:
+            resp = await self.http_client.get(target_url, timeout=10, follow_redirects=True)
+            results["live_hosts"] = [{
+                "url": target_url,
+                "status_code": resp.status_code,
+                "title": self._extract_title(resp.text),
+                "tech": self._fingerprint_tech_sync(resp),
+            }]
+            results["tech_stack"][target_url] = self._fingerprint_tech_sync(resp)
+        except Exception as e:
+            results["errors"].append(f"basic recon: {e}")
+        return results
+
+    def _extract_title(self, html: str) -> str:
+        import re
+        match = re.search(r"<title[^>]*>([^<]+)</title>", html, re.IGNORECASE)
+        return match.group(1) if match else ""
+
+    def _fingerprint_tech_sync(self, resp) -> Dict:
+        tech = {}
+        server = resp.headers.get("server", "")
+        if server:
+            tech["server"] = server
+        powered_by = resp.headers.get("x-powered-by", "")
+        if powered_by:
+            tech["x-powered-by"] = powered_by
+        body = resp.text.lower()
+        tech["frameworks"] = self._detect_frameworks(body, resp.headers)
+        tech["cms"] = self._detect_cms(body, resp.headers)
+        tech["languages"] = self._detect_languages(resp.headers)
+        return tech
 
     async def _run_subfinder(self, domain: str) -> List[str]:
         subfinder_path = self.tools_dir / "subfinder"
@@ -53,7 +132,7 @@ class ReconModule:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await proc.communicate()
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
 
             subdomains = set()
             for line in stdout.decode().strip().split("\n"):
@@ -66,6 +145,8 @@ class ReconModule:
                     except Exception:
                         pass
             return sorted(subdomains)
+        except asyncio.TimeoutError:
+            return []
         except Exception:
             return []
 
@@ -77,12 +158,15 @@ class ReconModule:
         live = []
         for host in hosts:
             try:
+                # Ensure host has a scheme
+                if not host.startswith(("http://", "https://")):
+                    host = "https://" + host
                 proc = await asyncio.create_subprocess_exec(
                     str(httpx_path), "-u", host, "-silent", "-json", "-title", "-tech-detect", "-status-code",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await proc.communicate()
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
 
                 for line in stdout.decode().strip().split("\n"):
                     if line:
@@ -91,6 +175,8 @@ class ReconModule:
                             live.append(data)
                         except Exception:
                             pass
+            except asyncio.TimeoutError:
+                pass
             except Exception:
                 pass
         return live

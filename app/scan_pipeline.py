@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 from app.database import get_db_session
 from app.models import ScanSession, ScanStatus, CrawlData, AuthSession
@@ -26,6 +27,8 @@ class ScanPipeline:
         self.http_client = None
         self.findings_store = FindingStore(self.db)
         self.scan_session = None
+        self.tool_status = {}
+        self._playwright = None
 
     async def initialize(self):
         self.http_client = httpx.AsyncClient(
@@ -34,8 +37,8 @@ class ScanPipeline:
             verify=False,
         )
 
-        playwright = await async_playwright().start()
-        self.playwright_browser = await playwright.chromium.launch(headless=True)
+        self._playwright = await async_playwright().start()
+        self.playwright_browser = await self._playwright.chromium.launch(headless=True)
 
         await self.oob_server.start()
 
@@ -49,7 +52,15 @@ class ScanPipeline:
         if self.http_client:
             await self.http_client.aclose()
         if self.playwright_browser:
-            await self.playwright_browser.close()
+            try:
+                await self.playwright_browser.close()
+            except Exception:
+                pass
+        if self._playwright:
+            try:
+                await self._playwright.stop()
+            except Exception:
+                pass
         await self.oob_server.stop()
         self.db.close()
 
@@ -64,13 +75,27 @@ class ScanPipeline:
             auth_sessions = self._load_auth_sessions()
 
             await self._update_progress("Running reconnaissance...", 10)
-            recon_results = await self._run_recon(target_url, scope_config)
+            recon_results = await asyncio.wait_for(
+                self._run_recon(target_url, scope_config),
+                timeout=45,
+            )
+
+            # Store tool status
+            self.tool_status = recon_results.get("tool_status", {})
+            self.scan_session.config = {**(self.scan_session.config or {}), "tool_status": self.tool_status, "recon_errors": recon_results.get("errors", [])}
+            self.db.commit()
 
             await self._update_progress("Crawling application...", 30)
-            endpoints = await self._run_crawl(target_url, auth_sessions, scope_config)
+            endpoints = await asyncio.wait_for(
+                self._run_crawl(target_url, auth_sessions, scope_config),
+                timeout=90,
+            )
 
             await self._update_progress("Running detectors...", 50)
-            findings = await self._run_detectors(endpoints, auth_sessions, selected_detectors)
+            findings = await asyncio.wait_for(
+                self._run_detectors(endpoints, auth_sessions, selected_detectors),
+                timeout=120,
+            )
 
             await self._update_progress("Finalizing...", 90)
             await self._finalize(findings)
@@ -81,11 +106,16 @@ class ScanPipeline:
             self.scan_session.completed_at = datetime.utcnow()
             self.db.commit()
 
-        except Exception as e:
-            self.scan_session.status = ScanStatus.FAILED
-            self.scan_session.error_message = str(e)
+        except asyncio.TimeoutError:
+            self.scan_session.status = ScanStatus.COMPLETED
             self.scan_session.completed_at = datetime.utcnow()
             self.db.commit()
+        except Exception as e:
+            if self.scan_session:
+                self.scan_session.status = ScanStatus.FAILED
+                self.scan_session.error_message = str(e)
+                self.scan_session.completed_at = datetime.utcnow()
+                self.db.commit()
             raise
 
     async def _update_progress(self, message: str, percent: int):
@@ -140,20 +170,37 @@ class ScanPipeline:
                 detector.set_auth_sessions(auth_sessions)
 
         all_findings = []
+        concurrency = self.scan_session.config.get("concurrency", 5) if self.scan_session and self.scan_session.config else 5
+        semaphore = asyncio.Semaphore(max(concurrency, 5))
 
+        # Run detectors concurrently across endpoints, limited by semaphore
+        async def run_detector_on_endpoint(detector, endpoint):
+            if not detector.applies_to(endpoint):
+                return []
+            async with semaphore:
+                try:
+                    return await asyncio.wait_for(detector.run(endpoint), timeout=45)
+                except (asyncio.TimeoutError, Exception):
+                    return []
+
+        tasks = []
         for endpoint in endpoints:
             for detector in all_detectors:
-                if detector.applies_to(endpoint):
-                    try:
-                        findings = await detector.run(endpoint)
-                        for finding in findings:
-                            cvss_result = CVSSScorer.score(finding.vuln_class, finding.cvss_vector)
-                            finding.cvss_vector = cvss_result["vector"]
+                tasks.append(run_detector_on_endpoint(detector, endpoint))
 
-                            model = self.findings_store.save(finding, self.scan_session_id)
-                            all_findings.append(model)
-                    except Exception:
-                        pass
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, Exception) or not result:
+                continue
+            for finding in result:
+                try:
+                    cvss_result = CVSSScorer.score(finding.vuln_class, finding.cvss_vector)
+                    finding.cvss_vector = cvss_result["vector"]
+                    model = self.findings_store.save(finding, self.scan_session_id)
+                    all_findings.append(model)
+                except Exception:
+                    pass
 
         return all_findings
 

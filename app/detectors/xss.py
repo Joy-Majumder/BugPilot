@@ -203,77 +203,90 @@ class ReflectedXSSDetector(Detector):
         test_resp = await self._fetch_with_browser(test_url)
 
         if not test_resp:
+            if control_resp and control_resp.get("page"):
+                try:
+                    await control_resp["page"].close()
+                except Exception:
+                    pass
             return None
 
-        validation = Validator.xss_executed(test_resp["page"], marker)
-        if validation.confirmed:
-            screenshot = await self._capture_screenshot(test_resp["page"])
-            return self._make_finding(
-                endpoint=endpoint,
-                param=param,
-                confidence="confirmed",
-                evidence={
-                    "payload": payload,
-                    "context": context,
-                    "marker": marker,
-                    "request_url": test_url,
-                    "response_status": test_resp["status"],
-                    "response_headers": dict(test_resp["headers"]),
-                    "screenshot": screenshot,
-                    "validation": validation.evidence,
-                },
-                summary=f"Reflected XSS in parameter '{param}' via {context} context",
-                description=(
-                    f"The parameter '{param}' at {endpoint.url} reflects user input without proper "
-                    f"output encoding. An attacker can inject arbitrary JavaScript that executes "
-                    f"in a victim's browser when they visit a crafted URL."
-                ),
-                steps_to_reproduce=(
-                    f"1. Navigate to: {test_url}\n"
-                    f"2. Observe JavaScript execution (marker '{marker}' set in window.__xss_fired__)\n"
-                    f"3. The payload executes in the victim's browser context"
-                ),
-                impact=(
-                    "An attacker can steal session cookies, perform actions on behalf of the user, "
-                    "deface the page, or deliver malware via reflected XSS."
-                ),
-                remediation=(
-                    "Implement context-aware output encoding. For HTML context, encode < > \" ' &. "
-                    "For JavaScript context, use JSON encoding. For URL context, use URL encoding. "
-                    "Implement a strong Content Security Policy (CSP) as defense-in-depth."
-                ),
-            )
+        try:
+            validation = await Validator.xss_executed(test_resp["page"], marker)
+            if validation.confirmed:
+                screenshot = await self._capture_screenshot(test_resp["page"])
+                return self._make_finding(
+                    endpoint=endpoint,
+                    param=param,
+                    confidence="confirmed",
+                    evidence={
+                        "payload": payload,
+                        "context": context,
+                        "marker": marker,
+                        "request_url": test_url,
+                        "response_status": test_resp["status"],
+                        "response_headers": dict(test_resp["headers"]),
+                        "screenshot": screenshot,
+                        "validation": validation.evidence,
+                    },
+                    summary=f"Reflected XSS in parameter '{param}' via {context} context",
+                    description=(
+                        f"The parameter '{param}' at {endpoint.url} reflects user input without proper "
+                        f"output encoding. An attacker can inject arbitrary JavaScript that executes "
+                        f"in a victim's browser when they visit a crafted URL."
+                    ),
+                    steps_to_reproduce=(
+                        f"1. Navigate to: {test_url}\n"
+                        f"2. Observe JavaScript execution (marker '{marker}' set in window.__xss_fired__)\n"
+                        f"3. The payload executes in the victim's browser context"
+                    ),
+                    impact=(
+                        "An attacker can steal session cookies, perform actions on behalf of the user, "
+                        "deface the page, or deliver malware via reflected XSS."
+                    ),
+                    remediation=(
+                        "Implement context-aware output encoding. For HTML context, encode < > \" ' &. "
+                        "For JavaScript context, use JSON encoding. For URL context, use URL encoding. "
+                        "Implement a strong Content Security Policy (CSP) as defense-in-depth."
+                    ),
+                )
 
-        # Also check for reflection without execution (potential XSS)
-        reflection_check = await self._check_reflection(test_resp, marker)
-        if reflection_check:
-            return self._make_finding(
-                endpoint=endpoint,
-                param=param,
-                confidence="suspected",
-                evidence={
-                    "payload": payload,
-                    "context": context,
-                    "marker": marker,
-                    "request_url": test_url,
-                    "reflection": reflection_check,
-                    "note": "Payload reflected but not executed - may be blocked by CSP or encoding",
-                },
-                summary=f"Potential Reflected XSS in parameter '{param}' - payload reflected",
-                description=(
-                    f"The parameter '{param}' reflects user input. The payload was found in the response "
-                    f"but did not execute. This may indicate encoding/CSP protection or a false positive."
-                ),
-                steps_to_reproduce=(
-                    f"1. Navigate to: {test_url}\n"
-                    f"2. Search for '{marker}' in response\n"
-                    f"3. Verify if payload is encoded or blocked by CSP"
-                ),
-                impact="If encoding/CSP is bypassed, could lead to XSS.",
-                remediation="Verify context-aware encoding is applied. Check CSP policy. Use CSP nonces/hashes.",
-            )
+            # Also check for reflection without execution (potential XSS)
+            reflection_check = await self._check_reflection(test_resp, marker)
+            if reflection_check:
+                return self._make_finding(
+                    endpoint=endpoint,
+                    param=param,
+                    confidence="suspected",
+                    evidence={
+                        "payload": payload,
+                        "context": context,
+                        "marker": marker,
+                        "request_url": test_url,
+                        "reflection": reflection_check,
+                        "note": "Payload reflected but not executed - may be blocked by CSP or encoding",
+                    },
+                    summary=f"Potential Reflected XSS in parameter '{param}' - payload reflected",
+                    description=(
+                        f"The parameter '{param}' reflects user input. The payload was found in the response "
+                        f"but did not execute. This may indicate encoding/CSP protection or a false positive."
+                    ),
+                    steps_to_reproduce=(
+                        f"1. Navigate to: {test_url}\n"
+                        f"2. Search for '{marker}' in response\n"
+                        f"3. Verify if payload is encoded or blocked by CSP"
+                    ),
+                    impact="If encoding/CSP is bypassed, could lead to XSS.",
+                    remediation="Verify context-aware encoding is applied. Check CSP policy. Use CSP nonces/hashes.",
+                )
 
-        return None
+            return None
+        finally:
+            for resp in [control_resp, test_resp]:
+                if resp and resp.get("page"):
+                    try:
+                        await resp["page"].close()
+                    except Exception:
+                        pass
 
     async def _check_reflection(self, test_resp: Dict, marker: str) -> Optional[Dict]:
         """Check if payload is reflected in response"""
@@ -290,6 +303,7 @@ class ReflectedXSSDetector(Detector):
         return None
 
     async def _fetch_with_browser(self, url: str) -> Optional[Dict[str, Any]]:
+        page = None
         try:
             page = await self.playwright_browser.new_page()
             # Disable CSP for testing (but note it in evidence)
@@ -311,6 +325,11 @@ class ReflectedXSSDetector(Detector):
                 "body": await page.content(),
             }
         except Exception:
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
             return None
 
     async def _capture_screenshot(self, page) -> str:
@@ -367,6 +386,7 @@ class StoredXSSDetector(Detector):
             if p != param:
                 form_data[p] = endpoint.get_param_value(p) or "test"
 
+        page = None
         try:
             page = await self.playwright_browser.new_page()
             await page.goto(endpoint.url, wait_until="networkidle")
@@ -413,6 +433,12 @@ class StoredXSSDetector(Detector):
                 )
         except Exception:
             pass
+        finally:
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
         return None
 
     async def _capture_screenshot(self, page) -> str:
@@ -596,5 +622,11 @@ class DOMXSSDetector(Detector):
 
         except Exception:
             pass
+        finally:
+            if 'page' in dir() and page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
 
         return findings
