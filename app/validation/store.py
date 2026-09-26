@@ -16,10 +16,16 @@ class DedupEngine:
         ).first()
         return existing is not None
 
-    def get_existing(self, finding: DetectorFinding) -> Optional[FindingModel]:
-        return self.db.query(FindingModel).filter(
+    def get_existing(self, finding: DetectorFinding, scan_session_id: int = None) -> Optional[FindingModel]:
+        query = self.db.query(FindingModel).filter(
             FindingModel.dedup_hash == finding.dedup_hash
-        ).first()
+        )
+        if scan_session_id is not None:
+            query = query.filter(FindingModel.scan_session_id == scan_session_id)
+        return query.first()
+
+    def is_duplicate(self, finding: DetectorFinding, scan_session_id: int = None) -> bool:
+        return self.get_existing(finding, scan_session_id) is not None
 
 
 class FindingStore:
@@ -28,12 +34,15 @@ class FindingStore:
         self.dedup = DedupEngine(db)
 
     def save(self, finding: DetectorFinding, scan_session_id: int) -> FindingModel:
-        existing = self.dedup.get_existing(finding)
+        existing = self.dedup.get_existing(finding, scan_session_id)
         if existing:
             existing.confidence = ConfidenceLevel(finding.confidence)
             existing.evidence = finding.evidence
+            existing.cvss_vector = finding.cvss_vector
+            existing.cvss_score = int(finding.cvss_score * 10) if finding.cvss_score else None
             existing.updated_at = __import__("datetime").datetime.utcnow()
             self.db.commit()
+            self.db.refresh(existing)
             return existing
 
         model = FindingModel(
