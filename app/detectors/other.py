@@ -380,6 +380,10 @@ class CORSScanner(Detector):
             acac = resp.headers.get("access-control-allow-credentials", "")
 
             if acao == origin and acac.lower() == "true":
+                cors_headers = {
+                    h: v for h, v in resp.headers.items()
+                    if h.lower().startswith("access-control")
+                }
                 return self._make_finding(
                     endpoint=endpoint,
                     param=None,
@@ -389,6 +393,16 @@ class CORSScanner(Detector):
                         "acao": acao,
                         "acac": acac,
                         "response_headers": dict(resp.headers),
+                         "request_url": (
+                            f"OPTIONS {endpoint.url}\n"
+                            f"Origin: {origin}\n"
+                            f"Access-Control-Request-Method: POST\n"
+                            f"Access-Control-Request-Headers: Content-Type"
+                        ),
+                        "response_body_snippet": (
+                            f"HTTP/{resp.http_version} {resp.status_code}\n"
+                            + "\n".join(f"{k}: {v}" for k, v in cors_headers.items())
+                        ),
                     },
                     summary=f"CORS Misconfiguration: Reflects arbitrary Origin with credentials",
                     description=(
