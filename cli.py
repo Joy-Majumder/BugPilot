@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BugHunter CLI - Typer-based command-line interface."""
+"""BugPilot CLI - Typer-based command-line interface."""
 import sys
 import asyncio
 from typing import Optional
@@ -17,12 +17,12 @@ from app.reporting import generate_report
 from app.config import settings
 
 console = Console()
-app = typer.Typer(add_completion=False, help="BugHunter - Personal Bug Bounty Automation Tool")
+app = typer.Typer(add_completion=False, help="BugPilot - Personal Bug Bounty Automation Tool")
 
 
 def _print_banner():
     console.print(Panel.fit(
-        "[bold cyan]BugHunter[/bold cyan]\n"
+        "[bold cyan]BugPilot[/bold cyan]\n"
         "[dim]Personal Bug Bounty Automation Tool[/dim]",
         border_style="cyan",
     ))
@@ -182,7 +182,7 @@ def serve(
     """Start the web UI server."""
     import uvicorn
 
-    console.print(f"[green]Starting BugHunter web UI on http://{host}:{port}[/green]")
+    console.print(f"[green]Starting BugPilot web UI on http://{host}:{port}[/green]")
     console.print("[dim]Press Ctrl+C to stop[/dim]")
     uvicorn.run("app.server:app", host=host, port=port, reload=False)
 
@@ -279,7 +279,7 @@ async def _run_scan_interactive(target, name, detectors_str, rate_limit, concurr
         db.close()
         console.print(f"[green]Found {len(db_findings)} findings[/green]")
         if db_findings:
-            console.print(f"\nRun [cyan]bughunter findings -s {scan_id}[/cyan] to view details")
+            console.print(f"\nRun [cyan]bugpilot findings -s {scan_id}[/cyan] to view details")
     except Exception as e:
         console.print(f"[red]Scan failed: {e}[/red]")
     finally:
@@ -290,7 +290,7 @@ async def _run_scan_interactive(target, name, detectors_str, rate_limit, concurr
 def main(
     ctx: typer.Context,
 ):
-    """BugHunter - Personal Bug Bounty Automation Tool.
+    """BugPilot - Personal Bug Bounty Automation Tool.
 
     Without arguments, launches an interactive menu.
     Pass a command to run it directly.

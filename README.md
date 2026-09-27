@@ -1,4 +1,4 @@
-# BugHunter - Personal Bug Bounty Automation Tool
+# BugPilot - Personal Bug Bounty Automation Tool
 
 > **⚠️ Legal Notice**: This tool is for testing targets you are explicitly authorized to test — programs on HackerOne/Bugcrowd where you're enrolled and in-scope, or your own infrastructure. Running any of this against unauthorized targets is illegal regardless of intent.
 
@@ -17,28 +17,28 @@ A self-contained, local-first bug bounty automation tool that runs as a web appl
 ## Quick Start
 
 ```bash
-git clone <this-repo> bughunter
-cd bughunter
+git clone <this-repo> bugpilot
+cd bugpilot
 ./bootstrap.sh
 
 # Start the web UI
-bughunter serve
+bugpilot serve
 # Open http://127.0.0.1:8080
 
 # Or run interactively (no args = menu)
-bughunter
+bugpilot
 
 # Or use CLI commands directly
-bughunter scan --target https://example.com
-bughunter list-scans
-bughunter findings --scan-id 1
-bughunter report --finding-id 1 --format bugcrowd
+bugpilot scan --target https://example.com
+bugpilot list-scans
+bugpilot findings --scan-id 1
+bugpilot report --finding-id 1 --format bugcrowd
 ```
 
 ## Directory Structure
 
 ```
-bughunter/
+bugpilot/
 ├── venv/                      # Local Python virtualenv
 ├── tools/                     # Downloaded binaries (nuclei, subfinder, httpx, Playwright browsers)
 ├── data/
@@ -133,28 +133,28 @@ SERVER_PORT=8080
 
 ```bash
 # Interactive menu (run with no arguments)
-bughunter
+bugpilot
 
 # Run a scan
-bughunter scan --target https://example.com --name "My Scan" --detectors sqli,ssrf --rate-limit 10 --concurrency 5
+bugpilot scan --target https://example.com --name "My Scan" --detectors sqli,ssrf --rate-limit 10 --concurrency 5
 
 # List all scans
-bughunter list-scans
+bugpilot list-scans
 
 # View findings for a scan
-bughunter findings --scan-id 1
+bugpilot findings --scan-id 1
 
 # Generate a report for a finding
-bughunter report --finding-id 1 --format hackerone  # or bugcrowd
+bugpilot report --finding-id 1 --format hackerone  # or bugcrowd
 
 # Start web UI
-bughunter serve  # or: bughunter serve --port 9090
+bugpilot serve  # or: bugpilot serve --port 9090
 ```
 
 ## Adding Custom Payloads
 
 ```bash
-bughunter payload add --category sqli --context "mysql" --payload "' OR '1'='1" --desc "Basic boolean bypass"
+bugpilot payload add --category sqli --context "mysql" --payload "' OR '1'='1" --desc "Basic boolean bypass"
 ```
 
 Or via web UI → Settings → Payload Library.

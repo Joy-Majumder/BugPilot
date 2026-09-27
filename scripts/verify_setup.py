@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BugHunter Installation Verification Script
+BugPilot Installation Verification Script
 Verifies all dependencies, tools, and configuration are properly set up.
 """
 import sys
@@ -228,7 +228,7 @@ def check_ssrf_bypasses():
 
 def main():
     print("=" * 60)
-    print("BugHunter Installation Verification")
+    print("BugPilot Installation Verification")
     print("=" * 60)
 
     all_passed = True
@@ -317,7 +317,7 @@ def main():
     # Summary
     print("\n" + "=" * 60)
     if all_passed:
-        print("ALL CHECKS PASSED - BugHunter is ready to run!")
+        print("ALL CHECKS PASSED - BugPilot is ready to run!")
         print(f"Start server: cd {PROJECT_DIR.parent} && python -m app.server")
         print(f"Or:           cd {PROJECT_DIR.parent} && uvicorn app.server:app --host 127.0.0.1 --port 8080")
     else:

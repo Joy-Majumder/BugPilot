@@ -16,7 +16,7 @@ from app.reporting import generate_report
 from app.config import settings
 
 
-app = FastAPI(title="BugHunter", description="Personal Bug Bounty Automation Tool")
+app = FastAPI(title="BugPilot", description="Personal Bug Bounty Automation Tool")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")

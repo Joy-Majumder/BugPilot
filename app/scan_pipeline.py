@@ -21,20 +21,11 @@ from playwright.async_api import async_playwright
 
 
 COMMON_API_PATHS = [
-    "/api", "/api/v1", "/api/v2", "/api/v3", "/api/v4", "/api/v5",
-    "/api/v6", "/api/v7", "/api/v8", "/api/json", "/api/rest",
-    "/rest", "/rest/v1", "/rest/v2", "/graphql", "/graphql/graphql",
-    "/gql", "/wp-json", "/wp-json/wp/v2", "/admin", "/admin/api",
-    "/admin/api/v1", "/api/admin", "/api/users", "/api/auth",
-    "/api/login", "/api/search", "/api/data", "/api/config",
-    "/api/status", "/api/health", "/api/version", "/api/docs",
-    "/api/swagger", "/api/openapi", "/api/swagger.json",
-    "/api/swaggerui", "/api/redoc", "/api/v1/api", "/v1", "/v2",
-    "/v3", "/internal", "/internal/api", "/debug", "/debug/vars",
-    "/metrics", "/prometheus", "/api/metrics", "/api/config.json",
-    "/api/settings", "/api/info", "/api/me", "/api/profile",
-    "/api/account", "/api/orders", "/api/products", "/api/cart",
-    "/api/checkout", "/api/payment", "/api/webhook", "/api/callback",
+    "/api", "/api/v1", "/api/v2", "/api/v3", "/rest", "/rest/v1",
+    "/graphql", "/wp-json", "/wp-json/wp/v2", "/admin", "/api/admin",
+    "/api/users", "/api/auth", "/api/login", "/api/data", "/api/config",
+    "/api/status", "/api/health", "/api/docs", "/api/openapi", "/console",
+    "/v1", "/v2", "/v3", "/.env", "/.git/config", "/robots.txt", "/sitemap.xml",
 ]
 
 BLACKLISTED_HOSTS = {"youtube.com", "youtu.be", "linkedin.com", "linkedin.com", 
@@ -261,7 +252,7 @@ class ScanPipeline:
         for path in COMMON_API_PATHS:
             url = base + path
             try:
-                resp = await self.http_client.get(url, timeout=10, follow_redirects=True)
+                resp = await self.http_client.get(url, timeout=5, follow_redirects=True)
                 if resp.status_code < 400:
                     api_urls.append(url)
             except Exception:
@@ -294,7 +285,8 @@ class ScanPipeline:
                     return []
 
         tasks = []
-        for endpoint in endpoints:
+        max_endpoints = 30
+        for endpoint in endpoints[:max_endpoints]:
             for detector in all_detectors:
                 tasks.append(run_detector_on_endpoint(detector, endpoint))
 
@@ -334,6 +326,6 @@ class ScanPipeline:
                 pass
 
         if report_paths:
-            print(f"[BugHunter] Auto-generated {len(report_paths)} report(s)")
+            print(f"[BugPilot] Auto-generated {len(report_paths)} report(s)")
             for p in report_paths:
                 print(f"  - {p}")
