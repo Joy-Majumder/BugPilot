@@ -1,4 +1,4 @@
-# BugPilot - Personal Bug Bounty Automation Tool
+# BugPilot — Open-source bug bounty automation that finds, validates, and reports web vulnerabilities.
 
 > **⚠️ Legal Notice**: This tool is for testing targets you are explicitly authorized to test — programs on HackerOne/Bugcrowd where you're enrolled and in-scope, or your own infrastructure. Running any of this against unauthorized targets is illegal regardless of intent.
 

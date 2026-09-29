@@ -17,13 +17,13 @@ from app.reporting import generate_report
 from app.config import settings
 
 console = Console()
-app = typer.Typer(add_completion=False, help="BugPilot - Personal Bug Bounty Automation Tool")
+app = typer.Typer(add_completion=False, help="BugPilot — Open-source bug bounty automation that finds, validates, and reports web vulnerabilities.")
 
 
 def _print_banner():
     console.print(Panel.fit(
         "[bold cyan]BugPilot[/bold cyan]\n"
-        "[dim]Personal Bug Bounty Automation Tool[/dim]",
+        "[dim]Open-source bug bounty automation tool[/dim]",
         border_style="cyan",
     ))
 
@@ -290,7 +290,7 @@ async def _run_scan_interactive(target, name, detectors_str, rate_limit, concurr
 def main(
     ctx: typer.Context,
 ):
-    """BugPilot - Personal Bug Bounty Automation Tool.
+    """BugPilot — Open-source bug bounty automation that finds, validates, and reports web vulnerabilities.
 
     Without arguments, launches an interactive menu.
     Pass a command to run it directly.
