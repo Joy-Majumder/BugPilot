@@ -55,8 +55,9 @@ class Finding:
     def dedup_hash(self) -> str:
         from urllib.parse import urlparse
         parsed = urlparse(self.endpoint)
-        host = f"{parsed.scheme}://{parsed.netloc}"
-        key = f"{self.vuln_class}|{host}|{self.param or ''}"
+        parts = parsed.netloc.split(":")[0].split(".")
+        root_domain = ".".join(parts[-2:]) if len(parts) >= 2 else parsed.netloc.split(":")[0]
+        key = f"{self.vuln_class}|{root_domain}|{self.param or ''}"
         return hashlib.sha256(key.encode()).hexdigest()[:64]
 
     @property
