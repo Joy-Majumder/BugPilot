@@ -1,6 +1,6 @@
 # BugPilot — Open-source bug bounty automation that finds, validates, and reports web vulnerabilities.
 
-> **⚠️ Legal Notice**: This tool is for testing targets you are explicitly authorized to test — programs on HackerOne/Bugcrowd where you're enrolled and in-scope, or your own infrastructure. Running any of this against unauthorized targets is illegal regardless of intent.
+> **Legal Notice**: This tool is for testing targets you are explicitly authorized to test.
 
 A self-contained, local-first bug bounty automation tool that runs as a web application. Everything (Python deps, binaries like nuclei/sqlmap, databases) lives inside the project directory — no system-wide installation.
 
@@ -150,23 +150,6 @@ bugpilot report --finding-id 1 --format hackerone  # or bugcrowd
 # Start web UI
 bugpilot serve  # or: bugpilot serve --port 9090
 ```
-
-## Adding Custom Payloads
-
-```bash
-bugpilot payload add --category sqli --context "mysql" --payload "' OR '1'='1" --desc "Basic boolean bypass"
-```
-
-Or via web UI → Settings → Payload Library.
-
-## Architecture Highlights
-
-1. **Plugin-based detectors** — Each vuln class is a独立 `Detector` class with `applies_to()` and `run()`
-2. **Multi-role crawling** — Crawl as multiple users simultaneously for IDOR/BOLA detection
-3. **Stateful workflow testing** — Multi-step flows (cart→checkout) with concurrent race testing
-4. **Scope-aware** — Parses program scope rules, enforces rate limits, excludes paths
-5. **Dedup by design** — `hash(vuln_class + endpoint + param)` prevents duplicate findings
-6. **Confidence tagging** — `confirmed` (proof) vs `suspected` (heuristic only)
 
 ## Requirements
 

@@ -6,54 +6,213 @@
     <title>{{ scan.target_url }} - BugPilot</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.6; min-height: 100vh; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
-        header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
-        h1 { font-size: 1.5rem; font-weight: 600; color: #f0f6fc; }
-        .scan-meta { display: flex; gap: 24px; color: #8b949e; font-size: 14px; }
-        .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; }
-        .btn-primary { background: #238636; color: white; }
-        .btn-primary:hover { background: #2ea043; }
-        .btn-secondary { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
-        .btn-secondary:hover { background: #30363d; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
-        .severity { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-        .sev-critical { background: #da3633; color: white; }
-        .sev-high { background: #f85149; color: white; }
-        .sev-medium { background: #d29922; color: black; }
-        .sev-low { background: #238636; color: white; }
-        .sev-info { background: #58a6ff; color: white; }
-        .confidence { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; margin-left: 8px; }
-        .conf-confirmed { background: #238636; color: white; }
-        .conf-suspected { background: #9e6a03; color: white; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: #010409;
+            color: #e6edf3;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+        h1 { font-size: 1.3rem; font-weight: 600; color: #f0f6fc; word-break: break-all; }
+        .scan-meta { display: flex; gap: 24px; color: #8b949e; font-size: 13px; flex-wrap: wrap; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .btn-primary { background: #23834e; color: white; }
+        .btn-primary:hover { background: #2c965e; }
+        .btn-secondary { background: #161b22; color: #e6edf3; border: 1px solid #21262d; }
+        .btn-secondary:hover { background: #1c2128; }
+        .card {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        }
+        .severity {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .sev-critical { background: #4d2223; color: #ff6b6b; }
+        .sev-high { background: #4d2223; color: #ff6b6b; }
+        .sev-medium { background: #4d4326; color: #ffd479; }
+        .sev-low { background: #1a4726; color: #4ade80; }
+        .sev-info { background: #203c66; color: #7fb6ff; }
+        .confidence {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .conf-confirmed { background: #1a4726; color: #4ade80; }
+        .conf-suspected { background: #4d4326; color: #ffd479; }
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #30363d; }
-        th { color: #8b949e; font-weight: 600; font-size: 11px; text-transform: uppercase; }
-        tr:hover { background: #1c2128; }
-        .endpoint { font-family: monospace; font-size: 12px; max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #21262d; }
+        th { color: #8b949e; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+        tr:hover { background: #0d1117; }
+        .endpoint { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-y: auto;
+        }
         .modal.active { display: flex; }
-        .modal-content { background: #161b22; border: 1px solid #30363d; border-radius: 12px; width: 100%; max-width: 900px; max-height: 85vh; overflow-y: auto; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #30363d; }
-        .modal-close { background: none; border: none; color: #8b949e; font-size: 28px; cursor: pointer; line-height: 1; }
+        .modal-content {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            margin: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid #21262d;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #8b949e;
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .modal-close:hover { background: #161b22; color: #e6edf3; }
         .modal-body { padding: 24px; }
         .section { margin-bottom: 24px; }
-        .section-title { font-size: 13px; font-weight: 600; color: #e6edf3; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .evidence-box { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 16px; }
-        .grid-item { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
-        .grid-label { font-size: 11px; color: #8b949e; text-transform: uppercase; margin-bottom: 4px; }
-        .grid-value { font-family: monospace; font-size: 13px; word-break: break-all; }
-        .tabs { display: flex; border-bottom: 1px solid #30363d; margin-bottom: 16px; }
-        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; color: #8b949e; font-size: 13px; font-weight: 500; }
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #8b949e;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .evidence-box {
+            background: #010409;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .grid-item {
+            background: #010409;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 14px;
+        }
+        .grid-label { font-size: 10px; color: #8b949e; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
+        .grid-value { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; word-break: break-all; color: #e6edf3; }
+        .tabs { display: flex; border-bottom: 1px solid #21262d; margin-bottom: 16px; }
+        .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; color: #8b949e; font-size: 13px; font-weight: 500; transition: all 0.2s; }
         .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .report-preview { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 20px; max-height: 60vh; overflow-y: auto; font-family: monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+        .report-preview {
+            background: #010409;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
         .report-preview h1, .report-preview h2, .report-preview h3 { color: #58a6ff; margin: 16px 0 8px; }
-        .report-preview code { background: #21262d; padding: 2px 6px; border-radius: 4px; }
-        .report-preview pre { background: #0d1117; padding: 12px; border-radius: 6px; overflow-x: auto; border: 1px solid #30363d; }
-        .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #30363d; }
+        .report-preview code { background: #161b22; padding: 2px 6px; border-radius: 4px; color: #ffa198; }
+        .report-preview pre {
+            background: #010409;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border: 1px solid #21262d;
+        }
+        .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #21262d; }
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1a7f37;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s;
+            z-index: 2000;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        @media (max-width: 640px) {
+            .container { padding: 16px; }
+            header { flex-direction: column; }
+            .scan-meta { gap: 12px; }
+            th, td { padding: 8px 12px; font-size: 12px; }
+        }
     </style>
 </head>
 <body>
@@ -68,14 +227,14 @@
                     {% if scan.completed_at %}<span>Completed: {{ scan.completed_at.strftime('%Y-%m-%d %H:%M') }}</span>{% endif %}
                 </div>
             </div>
-            <a href="/" class="btn btn-secondary">← Back</a>
+            <a href="/" class="btn btn-secondary">Back</a>
         </header>
 
         <div class="card">
             <table>
                 <thead>
                     <tr>
-                        <th>#</th>
+                        <th>ID</th>
                         <th>Severity</th>
                         <th>Confidence</th>
                         <th>Type</th>
@@ -83,7 +242,7 @@
                         <th>Method</th>
                         <th>Param</th>
                         <th>CVSS</th>
-                        <th>Actions</th>
+                        <th style="width: 160px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -93,7 +252,7 @@
                         <td><span class="severity sev-{{ finding.severity }}">{{ finding.severity }}</span></td>
                         <td><span class="confidence conf-{{ finding.confidence }}">{{ finding.confidence }}</span></td>
                         <td>{{ finding.vuln_class }}</td>
-                        <td class="endpoint" title="{{ finding.endpoint }}">{{ finding.endpoint }}</td>
+                        <td class="endpoint" title="{{ finding.endpoint }}">{{ finding.endpoint[:80] }}{% if finding.endpoint|length > 80 %}...{% endif %}</td>
                         <td>{{ finding.method }}</td>
                         <td>{{ finding.param or '-' }}</td>
                         <td>{{ '%.1f'|format(finding.cvss_score / 10) if finding.cvss_score else 'N/A' }}</td>
@@ -136,42 +295,55 @@
             <div class="actions">
                 <button class="btn btn-secondary" onclick="downloadReport('hackerone')">Download H1</button>
                 <button class="btn btn-secondary" onclick="downloadReport('bugcrowd')">Download BC</button>
-                <button class="btn btn-primary" onclick="copyReport()">Copy</button>
+                <button class="btn btn-primary" onclick="copyReport()">Copy to Clipboard</button>
             </div>
         </div>
     </div>
+
+    <div class="toast" id="toast"></div>
 
     <script>
         let currentFindingId = null;
         let currentReportFormat = 'hackerone';
 
+        function showToast(msg) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 2000);
+        }
+
         async function viewFinding(id) {
             currentFindingId = id;
-            const resp = await fetch(`/api/findings/${id}`);
-            const f = await resp.json();
-            document.getElementById('modalTitle').textContent = `${f.vuln_class} #${f.id}`;
-            document.getElementById('modalBody').innerHTML = `
-                <div class="section">
-                    <div class="section-title">Overview</div>
-                    <div class="grid">
-                        <div class="grid-item"><div class="grid-label">Type</div><div class="grid-value">${f.vuln_class}</div></div>
-                        <div class="grid-item"><div class="grid-label">Endpoint</div><div class="grid-value">${f.endpoint}</div></div>
-                        <div class="grid-item"><div class="grid-label">Method</div><div class="grid-value">${f.method}</div></div>
-                        <div class="grid-item"><div class="grid-label">Parameter</div><div class="grid-value">${f.param || 'N/A'}</div></div>
-                        <div class="grid-item"><div class="grid-label">Confidence</div><div class="grid-value"><span class="confidence conf-${f.confidence}">${f.confidence}</span></div></div>
-                        <div class="grid-item"><div class="grid-label">Severity</div><div class="grid-value"><span class="severity sev-${f.severity}">${f.severity}</span></div></div>
-                        <div class="grid-item"><div class="grid-label">CVSS</div><div class="grid-value">${f.cvss_score} (${f.cvss_vector})</div></div>
-                        <div class="grid-item"><div class="grid-label">VRT</div><div class="grid-value">${f.bugcrowd_vrt_category || 'N/A'}</div></div>
+            try {
+                const resp = await fetch(`/api/findings/${id}`);
+                const f = await resp.json();
+                document.getElementById('modalTitle').textContent = `${f.vuln_class} #${f.id}`;
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="section">
+                        <div class="section-title">Overview</div>
+                        <div class="grid">
+                            <div class="grid-item"><div class="grid-label">Type</div><div class="grid-value">${f.vuln_class}</div></div>
+                            <div class="grid-item"><div class="grid-label">Endpoint</div><div class="grid-value">${f.endpoint}</div></div>
+                            <div class="grid-item"><div class="grid-label">Method</div><div class="grid-value">${f.method}</div></div>
+                            <div class="grid-item"><div class="grid-label">Parameter</div><div class="grid-value">${f.param || 'N/A'}</div></div>
+                            <div class="grid-item"><div class="grid-label">Confidence</div><div class="grid-value"><span class="confidence conf-${f.confidence}">${f.confidence}</span></div></div>
+                            <div class="grid-item"><div class="grid-label">Severity</div><div class="grid-value"><span class="severity sev-${f.severity}">${f.severity}</span></div></div>
+                            <div class="grid-item"><div class="grid-label">CVSS</div><div class="grid-value">${f.cvss_score} (${f.cvss_vector})</div></div>
+                            <div class="grid-item"><div class="grid-label">VRT Category</div><div class="grid-value">${f.bugcrowd_vrt_category || 'N/A'}</div></div>
+                        </div>
                     </div>
-                </div>
-                <div class="section"><div class="section-title">Summary</div><div>${f.summary || 'N/A'}</div></div>
-                <div class="section"><div class="section-title">Description</div><div>${f.description || 'N/A'}</div></div>
-                <div class="section"><div class="section-title">Steps to Reproduce</div><div class="evidence-box">${f.steps_to_reproduce || 'N/A'}</div></div>
-                <div class="section"><div class="section-title">Impact</div><div>${f.impact || 'N/A'}</div></div>
-                <div class="section"><div class="section-title">Remediation</div><div>${f.remediation || 'N/A'}</div></div>
-                <div class="section"><div class="section-title">Evidence</div><div class="evidence-box">${JSON.stringify(f.evidence, null, 2)}</div></div>
-            `;
-            document.getElementById('findingModal').classList.add('active');
+                    <div class="section"><div class="section-title">Summary</div><div>${f.summary || 'N/A'}</div></div>
+                    <div class="section"><div class="section-title">Description</div><div>${f.description || 'N/A'}</div></div>
+                    <div class="section"><div class="section-title">Steps to Reproduce</div><div class="evidence-box">${f.steps_to_reproduce || 'N/A'}</div></div>
+                    <div class="section"><div class="section-title">Impact</div><div>${f.impact || 'N/A'}</div></div>
+                    <div class="section"><div class="section-title">Remediation</div><div>${f.remediation || 'N/A'}</div></div>
+                    <div class="section"><div class="section-title">Evidence</div><div class="evidence-box">${JSON.stringify(f.evidence, null, 2)}</div></div>
+                `;
+                document.getElementById('findingModal').classList.add('active');
+            } catch (e) {
+                showToast('Failed to load finding');
+            }
         }
 
         function closeModal() {
@@ -181,16 +353,22 @@
         async function generateReport(id, format) {
             currentFindingId = id;
             currentReportFormat = format;
-            const resp = await fetch(`/api/findings/${id}/report`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `format=${format}`
-            });
-            const result = await resp.json();
-            if (result.report_path) {
-                await loadReport(result.report_path, format);
-                document.getElementById('reportModal').classList.add('active');
-                switchTab(format);
+            try {
+                const resp = await fetch(`/api/findings/${id}/report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `format=${format}`
+                });
+                const result = await resp.json();
+                if (result.report_path) {
+                    await loadReport(result.report_path, format);
+                    document.getElementById('reportModal').classList.add('active');
+                    switchTab(format);
+                } else {
+                    showToast('Failed to generate report');
+                }
+            } catch (e) {
+                showToast('Error generating report');
             }
         }
 
@@ -208,14 +386,16 @@
             currentReportFormat = format;
         }
 
-        async function downloadReport(format) {
+        function downloadReport(format) {
             window.open(`/api/findings/${currentFindingId}/report/download?format=${format}`, '_blank');
         }
 
         async function copyReport() {
             const el = document.getElementById(currentReportFormat === 'hackerone' ? 'tab-hackerone' : 'tab-bugcrowd');
-            await navigator.clipboard.writeText(el.textContent);
-            alert('Copied!');
+            if (el && el.textContent) {
+                await navigator.clipboard.writeText(el.textContent);
+                showToast('Copied to clipboard');
+            }
         }
 
         function closeReportModal() {

@@ -6,51 +6,229 @@
     <title>BugPilot</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.6; min-height: 100vh; }
-        .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
-        h1 { font-size: 2rem; font-weight: 600; color: #f0f6fc; margin-bottom: 8px; }
-        .subtitle { color: #8b949e; margin-bottom: 40px; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 32px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: #010409;
+            color: #e6edf3;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+        h1 { font-size: 2rem; font-weight: 700; color: #f0f6fc; margin-bottom: 8px; }
+        .subtitle { color: #8b949e; font-size: 0.95rem; margin-bottom: 40px; }
+        .card {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        }
         .form-group { margin-bottom: 24px; }
         label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #e6edf3; }
-        textarea, input { width: 100%; padding: 12px 16px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font-size: 14px; font-family: inherit; resize: vertical; }
-        textarea:focus, input:focus { outline: none; border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3); }
-        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; width: 100%; margin-top: 8px; }
-        .btn-primary { background: #238636; color: white; }
-        .btn-primary:hover { background: #2ea043; }
-        .btn-primary:disabled { background: #30363d; color: #8b949e; cursor: not-allowed; }
-        .btn-danger { background: #da3633; color: white; padding: 6px 12px; font-size: 12px; width: auto; }
+        textarea, input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #010409;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            color: #e6edf3;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: #23834e;
+            box-shadow: 0 0 0 3px rgba(35, 131, 78, 0.2);
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .btn-primary {
+            background: #23834e;
+            color: #fff;
+        }
+        .btn-primary:hover { background: #2c965e; }
+        .btn-primary:disabled {
+            background: #21262d;
+            color: #8b949e;
+            cursor: not-allowed;
+        }
+        .btn-ghost {
+            background: transparent;
+            color: #8b949e;
+            border: 1px solid #21262d;
+            padding: 8px 16px;
+            font-size: 13px;
+            width: auto;
+            margin-left: 8px;
+        }
+        .btn-ghost:hover {
+            background: #0d1117;
+            color: #e6edf3;
+        }
+        .btn-danger {
+            background: #da3633;
+            color: white;
+            padding: 6px 16px;
+            font-size: 12px;
+            width: auto;
+        }
         .btn-danger:hover { background: #f85149; }
-        .scan-list { margin-top: 40px; }
-        .scan-list h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 16px; }
-        .scan-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 12px; gap: 12px; }
+        .scan-list { margin-top: 48px; }
+        .scan-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .scan-list h2 { font-size: 1.1rem; font-weight: 600; }
+        .scan-list .count { color: #8b949e; font-size: 0.9rem; }
+        .scan-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        .scan-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 12px;
+            gap: 16px;
+            transition: border-color 0.2s;
+        }
+        .scan-item:hover { border-color: #30363d; }
         .scan-info { flex: 1; min-width: 0; }
-        .scan-url { font-family: monospace; font-size: 14px; color: #58a6ff; text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .scan-url {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 14px;
+            color: #58a6ff;
+            text-decoration: none;
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 6px;
+        }
         .scan-url:hover { text-decoration: underline; }
-        .scan-meta { font-size: 12px; color: #8b949e; margin-top: 4px; }
-        .scan-status { padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; white-space: nowrap; }
-        .status-pending { background: #9e6a03; color: #fff; }
-        .status-running { background: #0969da; color: #fff; }
-        .status-completed { background: #1a7f37; color: #fff; }
-        .status-failed { background: #da3633; color: #fff; }
-        .status-stopped { background: #6e7681; color: #fff; }
+        .scan-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: #8b949e;
+        }
+        .scan-meta .created { color: #8b949e; }
+        .scan-meta .findings { color: #58a6ff; font-weight: 600; }
+        .scan-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .status-pending { background: #4d4326; color: #ffd479; }
+        .status-running { background: #203c66; color: #7fb6ff; }
+        .status-completed { background: #1a4726; color: #4ade80; }
+        .status-failed { background: #4d2223; color: #ff6b6b; }
+        .status-stopped { background: #32383d; color: #c3d1d9; }
         .scan-actions { display: flex; gap: 8px; flex-shrink: 0; }
-        .progress-bar { height: 4px; background: #21262d; border-radius: 2px; overflow: hidden; margin-top: 8px; width: 100%; }
-        .progress-fill { height: 100%; background: #238636; transition: width 0.3s; }
-        .progress-msg { font-size: 12px; color: #8b949e; margin-top: 4px; }
-        .empty-state { text-align: center; color: #8b949e; padding: 40px; }
+        .progress-bar {
+            height: 6px;
+            background: #161b22;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 12px;
+            width: 100%;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #23834e, #2c965e);
+            transition: width 0.3s ease;
+            border-radius: 3px;
+        }
+        .progress-msg { font-size: 12px; color: #8b949e; margin-top: 6px; }
+        .empty-state {
+            text-align: center;
+            color: #8b949e;
+            padding: 60px 20px;
+            border: 1px dashed #21262d;
+            border-radius: 12px;
+        }
+        .empty-state p { font-size: 14px; margin-bottom: 16px; }
+        .empty-state a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        .empty-state a:hover { text-decoration: underline; }
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .tool-card {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .tool-card .name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e6edf3;
+            text-transform: capitalize;
+            margin-bottom: 4px;
+        }
+        .tool-card .version {
+            font-size: 11px;
+            color: #8b949e;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .footer {
+            margin-top: 48px;
+            text-align: center;
+            color: #656d76;
+            font-size: 12px;
+        }
+        @media (max-width: 640px) {
+            .container { padding: 24px 16px; }
+            h1 { font-size: 1.5rem; }
+            .card { padding: 24px 20px; }
+            .scan-item { padding: 16px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>BugPilot</h1>
-        <p class="subtitle">BugPilot - Open-source bug bounty automation that finds, validates, and reports web vulnerabilities</p>
+        <p class="subtitle">Open-source bug bounty automation that finds, validates, and reports web vulnerabilities.</p>
 
         <div class="card">
             <form id="scanForm">
                 <div class="form-group">
-                    <label>Target URL</label>
-                    <input type="url" name="target_url" placeholder="https://example.com" required>
+                    <label for="target_url">Target URL</label>
+                    <input type="url" name="target_url" id="target_url" placeholder="https://example.com" required>
                 </div>
                 <div class="form-group">
                     <label>Scope (include patterns, one per line)</label>
@@ -61,7 +239,6 @@
                     <textarea name="scope_exclude" rows="8" placeholder="logout
 signout
 /admin/delete
-/admin/*/delete
 /api/*/delete
 /reset-password
 /unsubscribe
@@ -78,26 +255,24 @@ signout
 *.svg
 *.ico
 *.xml
-*.json
-#regex: .*\.pdf$
-#regex: .*\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2|ttf|ico)$"></textarea>
+*.json"></textarea>
+                </div>
                 <button type="submit" class="btn btn-primary" id="startBtn">Start Scan</button>
             </form>
         </div>
 
-        <div class="card" id="toolStatusCard" style="display:none; margin-top: 24px;">
-            <h3 style="margin-bottom: 16px; font-size: 1rem;">External Tools Status</h3>
-            <div id="toolStatusGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;"></div>
-        </div>
-
         <div class="scan-list">
-            <h2>Recent Scans</h2>
-            <div id="scanList">
+            <div class="scan-list-header">
+                <h2>Recent Scans</h2>
+            </div>
+            <div class="scan-grid" id="scanList">
                 {% for scan in scans %}
                 <div class="scan-item" data-scan-id="{{ scan.id }}">
                     <div class="scan-info">
                         <a href="/scan/{{ scan.id }}" class="scan-url">{{ scan.target_url }}</a>
-                        <div class="scan-meta">{{ scan.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                        <div class="scan-meta">
+                            <span class="created">{{ scan.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
                         {% if scan.status == 'running' %}
                         <div class="progress-bar" id="progress-{{ scan.id }}">
                             <div class="progress-fill" style="width: {{ scan.config.get('progress_percent', 0) }}%"></div>
@@ -114,9 +289,20 @@ signout
                     </div>
                 </div>
                 {% else %}
-                <div class="empty-state">No scans yet. Start your first scan above.</div>
+                <div class="empty-state">
+                    <p>No scans yet. Start your first scan above.</p>
+                </div>
                 {% endfor %}
             </div>
+        </div>
+
+        <div class="card" id="toolStatusCard" style="display:none; margin-top: 24px;">
+            <h3 style="margin-bottom: 16px; font-size: 1rem;">External Tools Status</h3>
+            <div class="tool-grid" id="toolStatusGrid"></div>
+        </div>
+
+        <div class="footer">
+            BugPilot — Open-source bug bounty automation
         </div>
     </div>
 
@@ -182,13 +368,11 @@ signout
                         }
                         msgEl.textContent = scan.config?.progress_message || '';
                     }
-                    // Update status badge if changed
                     const statusEl = item.querySelector('.scan-status');
                     if (statusEl && statusEl.textContent.toLowerCase() !== scan.status) {
                         statusEl.textContent = scan.status;
-                        statusEl.className = `scan-status status-${scan.status}`;
+                        statusEl.className = 'scan-status status-' + scan.status;
                     }
-                    // Add/remove stop button
                     const actionsDiv = item.querySelector('.scan-actions');
                     if (scan.status === 'running' && !item.querySelector('.scan-actions button[onclick^="stopScan"]')) {
                         const stopBtn = document.createElement('button');
@@ -215,7 +399,7 @@ signout
             try {
                 const resp = await fetch(`/api/scans/${scanId}`, { method: 'DELETE' });
                 if (resp.ok) {
-                    document.querySelector(`.scan-item[data-scan-id="${scanId}"]`)?.remove();
+                    document.querySelector('.scan-item[data-scan-id="' + scanId + '"]')?.remove();
                 } else {
                     alert('Failed to delete scan');
                 }
@@ -226,7 +410,6 @@ signout
 
         setInterval(pollProgress, 3000);
 
-        // Fetch and display tool status
         async function loadToolStatus() {
             try {
                 const resp = await fetch('/api/tools/status');
@@ -235,7 +418,7 @@ signout
                 const grid = document.getElementById('toolStatusGrid');
                 const card = document.getElementById('toolStatusCard');
                 if (!data || Object.keys(data).length === 0) return;
-                
+
                 card.style.display = 'block';
                 grid.innerHTML = '';
                 for (const [tool, info] of Object.entries(data)) {
@@ -244,17 +427,13 @@ signout
                     const error = info.error || '';
                     const statusClass = available ? 'status-completed' : 'status-failed';
                     const statusText = available ? 'Available' : 'Missing';
-                    
+
                     const div = document.createElement('div');
-                    div.style.cssText = 'background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;';
-                    div.innerHTML = `
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <strong style="font-size:14px;text-transform:capitalize;">${tool}</strong>
-                            <span class="scan-status ${statusClass}" style="font-size:11px;padding:2px 8px;">${statusText}</span>
-                        </div>
-                        <div style="font-size:12px;color:#8b949e;font-family:monospace;">${version}</div>
-                        ${error ? `<div style="font-size:11px;color:#f85149;margin-top:4px;">${error}</div>` : ''}
-                    `;
+                    div.className = 'tool-card';
+                    div.innerHTML =
+                        '<div class="name">' + tool + '</div>' +
+                        '<div class="version">' + version.split('\n')[0] + '</div>' +
+                        (error ? '<div style="font-size:10px;color:#ff6b6b;margin-top:4px;">' + error + '</div>' : '');
                     grid.appendChild(div);
                 }
             } catch (e) {
@@ -262,7 +441,6 @@ signout
             }
         }
 
-        // Load tool status on page load
         loadToolStatus();
     </script>
 </body>
