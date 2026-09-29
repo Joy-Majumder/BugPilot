@@ -9,19 +9,13 @@
 
 ## Reporting a Vulnerability
 
-**Do not report security vulnerabilities through the public issue tracker.**
+To report a security vulnerability in BugPilot, please:
 
-If you discover a security vulnerability in BugPilot, please report it responsibly:
+1. Go to [GitHub Security Advisories](https://github.com/Joy-Majumder/BugPilot/security/advisories)
+2. Click "Draft a new advisory"
+3. Provide a detailed description of the vulnerability
 
-- **Email**: security@bugpilot.dev (PGP key available on request)
-- **HackerOne**: https://hackerone.com/bug-pilot (if available)
-
-Include in your report:
-1. Description of the vulnerability
-2. Steps to reproduce
-3. Affected version/commit (if known)
-4. Potential impact
-5. Your contact information
+Alternatively, you can open a **confidential** issue on GitHub with the `security` label.
 
 ## Scope
 
