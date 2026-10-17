@@ -336,11 +336,12 @@ class SSRFDetector(Detector):
         for technique_name, technique_func in self.BYPASS_TECHNIQUES.items():
             try:
                 bypassed = technique_func(ip)
-                if bypassed != ip:
+                if bypassed != ip and bypassed not in results:
                     results.append(bypassed)
             except Exception:
                 pass
         return results
+
 
     async def _test_waf_bypasses(self, endpoint: Endpoint, param: str) -> Optional[Finding]:
         """Test PortSwigger-style WAF bypasses"""
